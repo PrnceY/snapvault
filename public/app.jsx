@@ -9,6 +9,8 @@ const categories = [
   { id:"CAT-04", name:"Tripods", count:6, desc:"Supports & stabilizers" },
 ];
 
+//test
+
 const inventory = [
   { sn:"CR5-0042", item:"Canon EOS R5", cat:"Camera Bodies", condition:"Excellent", status:"Rented" },
   { sn:"SA7-0117", item:"Sony A7 IV", cat:"Camera Bodies", condition:"Good", status:"Available" },

@@ -1,13 +1,19 @@
 function RentalsPage({ data }) {
   const { rentals, customers, inventory, refetch } = data;
+  const [filter, setFilter] = useState("All");
   const [showForm, setShowForm] = useState(false);
   const [returningId, setReturningId] = useState(null);
   const [form, setForm] = useState({ CustomerID:"", SerialNumber:"", ExpectedBack:"", DepositAmount:"" });
   const [refundChoice, setRefundChoice] = useState("Full Refund");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
+  const filters = ["All","On Loan","Returned"];
 
   const availableItems = inventory.filter(i => i.Status === "Available");
+  const rows = rentals.filter(r => {
+    if (filter === "All") return true;
+    return filter === "On Loan" ? !r.ActualReturn : !!r.ActualReturn;
+  });
 
   const submitRental = (e) => {
     e.preventDefault();
@@ -59,7 +65,12 @@ function RentalsPage({ data }) {
 
   return (
     <>
-      <div className="pill-row" style={{justifyContent:"flex-end", display:"flex"}}>
+      <div className="pill-row" style={{justifyContent:"space-between", display:"flex", flexWrap:"wrap", gap:10}}>
+        <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+          {filters.map(f => (
+            <div key={f} className={`pill ${filter===f ? "on":""}`} onClick={() => setFilter(f)}>{f}</div>
+          ))}
+        </div>
         <div className="pill" style={{background:"var(--amber)", color:"#1A1320", borderColor:"var(--amber)", fontWeight:600}} onClick={() => setShowForm(true)}>
           + New Rental
         </div>
@@ -68,7 +79,7 @@ function RentalsPage({ data }) {
         <table>
           <thead><tr><th>Rental ID</th><th>Customer</th><th>Item</th><th>Date out</th><th>Expected back</th><th>Actual return</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            {rentals.map(r => (
+            {rows.map(r => (
               <tr key={r.RentalID}>
                 <td className="mono-cell">RNT-{r.RentalID}</td>
                 <td>{r.Customer}</td>

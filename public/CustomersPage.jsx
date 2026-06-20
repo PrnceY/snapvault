@@ -1,9 +1,15 @@
 function CustomersPage({ data }) {
   const { customers, refetch } = data;
+  const [filter, setFilter] = useState("All");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ FullName:"", IDType:"School ID", ContactNumber:"", Verified:false });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
+  const filters = ["All","Verified","Pending"];
+  const rows = customers.filter(c => {
+    if (filter === "All") return true;
+    return filter === "Verified" ? Number(c.Verified) === 1 : Number(c.Verified) === 0;
+  });
 
   const submit = (e) => {
     e.preventDefault();
@@ -34,7 +40,12 @@ function CustomersPage({ data }) {
 
   return (
     <>
-      <div className="pill-row" style={{justifyContent:"flex-end", display:"flex"}}>
+      <div className="pill-row" style={{justifyContent:"space-between", display:"flex", flexWrap:"wrap", gap:10}}>
+        <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+          {filters.map(f => (
+            <div key={f} className={`pill ${filter===f ? "on":""}`} onClick={() => setFilter(f)}>{f}</div>
+          ))}
+        </div>
         <div className="pill" style={{background:"var(--amber)", color:"#1A1320", borderColor:"var(--amber)", fontWeight:600}} onClick={() => setShowForm(true)}>
           + Add Customer
         </div>
@@ -43,7 +54,7 @@ function CustomersPage({ data }) {
         <table>
           <thead><tr><th>Customer ID</th><th>Name</th><th>ID Type</th><th>Contact</th><th>Verification</th></tr></thead>
           <tbody>
-            {customers.map(c => (
+            {rows.map(c => (
               <tr key={c.CustomerID}>
                 <td className="mono-cell">CUS-{String(c.CustomerID).padStart(3,"0")}</td>
                 <td className="empty-name">{c.FullName}</td>

@@ -1,46 +1,43 @@
-const { useState, useMemo } = React;
+const { useState, useEffect } = React;
 
-/* ---------------- Sample data ---------------- */
+/* ---------------- Live data fetched from PHP/MariaDB ---------------- */
+/* Each endpoint lives next to this file on the server, e.g.
+   https://snapvault.dcism.org/get_inventory.php                       */
 
-const categories = [
-  { id:"CAT-01", name:"Camera Bodies", count:9, desc:"Mirrorless & DSLR bodies" },
-  { id:"CAT-02", name:"Lenses", count:14, desc:"Primes, zooms, specialty glass" },
-  { id:"CAT-03", name:"Lighting", count:7, desc:"Strobes, continuous & modifiers" },
-  { id:"CAT-04", name:"Tripods", count:6, desc:"Supports & stabilizers" },
-];
+function useApiData() {
+  const [categories, setCategories] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [rentals, setRentals] = useState([]);
+  const [deposits, setDeposits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-//test
+  useEffect(() => {
+    Promise.all([
+      fetch("get_categories.php").then(r => r.json()),
+      fetch("get_inventory.php").then(r => r.json()),
+      fetch("get_customers.php").then(r => r.json()),
+      fetch("get_rentals.php").then(r => r.json()),
+      fetch("get_deposits.php").then(r => r.json()),
+    ])
+      .then(([cat, inv, cus, ren, dep]) => {
+        setCategories(cat);
+        setInventory(inv);
+        setCustomers(cus);
+        setRentals(ren);
+        setDeposits(dep);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setError("Could not load data from the server. Check that the PHP endpoints are uploaded and db_connect.php has the right credentials.");
+        setLoading(false);
+      });
+  }, []);
 
-const inventory = [
-  { sn:"CR5-0042", item:"Canon EOS R5", cat:"Camera Bodies", condition:"Excellent", status:"Rented" },
-  { sn:"SA7-0117", item:"Sony A7 IV", cat:"Camera Bodies", condition:"Good", status:"Available" },
-  { sn:"SG2470-009", item:"Sigma 24–70mm f/2.8", cat:"Lenses", condition:"Excellent", status:"Available" },
-  { sn:"CN70200-021", item:"Canon RF 70–200mm f/2.8", cat:"Lenses", condition:"Good", status:"Rented" },
-  { sn:"PF-B10-005", item:"Profoto B10 Flash", cat:"Lighting", condition:"Fair", status:"Maintenance" },
-  { sn:"MF-CF55-013", item:"Manfrotto Carbon Tripod", cat:"Tripods", condition:"Excellent", status:"Available" },
-  { sn:"GD-560-002", item:"Godox SL60 LED Panel", cat:"Lighting", condition:"Good", status:"Available" },
-];
-
-const customers = [
-  { id:"CUS-001", name:"Maria Ortega", idType:"School ID", contact:"0917 552 0143", verified:true },
-  { id:"CUS-002", name:"Diego Aguilar", idType:"Driver's License", contact:"0928 113 7720", verified:true },
-  { id:"CUS-003", name:"Liane Maratas", idType:"Passport", contact:"0945 880 2291", verified:false },
-  { id:"CUS-004", name:"Kyle Ouano", idType:"School ID", contact:"0933 220 4456", verified:true },
-];
-
-const rentals = [
-  { id:"RNT-101", customer:"Maria Ortega", item:"Canon EOS R5", out:"Jun 12", expected:"Jun 16", returned:null },
-  { id:"RNT-102", customer:"Diego Aguilar", item:"Canon RF 70–200mm f/2.8", out:"Jun 14", expected:"Jun 18", returned:null },
-  { id:"RNT-103", customer:"Kyle Ouano", item:"Godox SL60 LED Panel", out:"Jun 08", expected:"Jun 11", returned:"Jun 11" },
-  { id:"RNT-104", customer:"Liane Maratas", item:"Profoto B10 Flash", out:"Jun 05", expected:"Jun 09", returned:"Jun 13" },
-];
-
-const deposits = [
-  { id:"DEP-101", rental:"RNT-101", amount:8000, status:"Held" },
-  { id:"DEP-102", rental:"RNT-102", amount:12000, status:"Held" },
-  { id:"DEP-103", rental:"RNT-103", amount:3000, status:"Full Refund" },
-  { id:"DEP-104", rental:"RNT-104", amount:5000, status:"Partial Refund" },
-];
+  return { categories, inventory, customers, rentals, deposits, loading, error };
+}
 
 /* ---------------- Small components ---------------- */
 
@@ -53,7 +50,7 @@ function Chip({ tone, children }) {
 }
 
 function statusTone(s) {
-  if (s === "Available" || s === "Full Refund" || s === "Done") return "green";
+  if (s === "Available" || s === "Full Refund" || s === "Done" || s === "Verified" || s === 1 || s === true) return "green";
   if (s === "Rented" || s === "Held" || s === "Partial Refund") return "amber";
   if (s === "Maintenance" || s === "Forfeited" || s === "Overdue") return "rose";
   return "muted";
@@ -104,24 +101,33 @@ const pageMeta = {
   deposits: { title:"Deposits", desc:"Security funds held and refund status" },
 };
 
-/* ---------------- Pages ---------------- */
+function fmtDate(d) {
+  if (!d) return null;
+  return new Date(d).toLocaleDateString("en-US", { month:"short", day:"2-digit" });
+}
 
-function Dashboard() {
-  const activeRentals = rentals.filter(r => !r.returned).length;
-  const overdue = 1;
-  const heldTotal = deposits.filter(d => d.status === "Held").reduce((a,d) => a + d.amount, 0);
+/* ---------------- Pages (each receives live data as props) ---------------- */
+
+function Dashboard({ data }) {
+  const { inventory, rentals, deposits } = data;
+  const activeRentals = rentals.filter(r => !r.ActualReturn);
+  const now = new Date();
+  const overdue = activeRentals.filter(r => new Date(r.ExpectedBack) < now).length;
+  const heldTotal = deposits
+    .filter(d => d.RefundStatus === "Held")
+    .reduce((a, d) => a + Number(d.AmountHeld), 0);
 
   return (
     <>
       <div className="cards-grid">
         <div className="stat-card">
           <div className="top"><span className="lab" style={{fontSize:12,color:"var(--muted)"}}>Units in stock</span><div className="ic">{icons.inventory}</div></div>
-          <div className="num">36</div>
-          <div className="lab">Across 4 categories</div>
+          <div className="num">{inventory.length}</div>
+          <div className="lab">Across all categories</div>
         </div>
         <div className="stat-card">
           <div className="top"><span className="lab" style={{fontSize:12,color:"var(--muted)"}}>Active rentals</span><div className="ic">{icons.rentals}</div></div>
-          <div className="num">{activeRentals}</div>
+          <div className="num">{activeRentals.length}</div>
           <div className="lab">Currently checked out</div>
         </div>
         <div className="stat-card">
@@ -136,21 +142,24 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="section-head"><h2>Rentals currently out</h2><span className="count">{activeRentals} open</span></div>
+      <div className="section-head"><h2>Rentals currently out</h2><span className="count">{activeRentals.length} open</span></div>
       <Frame>
         <table>
           <thead><tr><th>Rental ID</th><th>Customer</th><th>Item</th><th>Date out</th><th>Expected back</th><th>Status</th></tr></thead>
           <tbody>
-            {rentals.filter(r => !r.returned).map(r => (
-              <tr key={r.id}>
-                <td className="mono-cell">{r.id}</td>
-                <td>{r.customer}</td>
-                <td>{r.item}</td>
-                <td className="mono-cell">{r.out}</td>
-                <td className="mono-cell">{r.expected}</td>
-                <td><Chip tone={r.expected === "Jun 16" ? "rose" : "amber"}>{r.expected === "Jun 16" ? "Overdue" : "On loan"}</Chip></td>
-              </tr>
-            ))}
+            {activeRentals.map(r => {
+              const isOverdue = new Date(r.ExpectedBack) < now;
+              return (
+                <tr key={r.RentalID}>
+                  <td className="mono-cell">RNT-{r.RentalID}</td>
+                  <td>{r.Customer}</td>
+                  <td>{r.Item}</td>
+                  <td className="mono-cell">{fmtDate(r.DateOut)}</td>
+                  <td className="mono-cell">{fmtDate(r.ExpectedBack)}</td>
+                  <td><Chip tone={isOverdue ? "rose" : "amber"}>{isOverdue ? "Overdue" : "On loan"}</Chip></td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </Frame>
@@ -158,20 +167,21 @@ function Dashboard() {
   );
 }
 
-function CategoriesPage() {
+function CategoriesPage({ data }) {
+  const { categories, inventory } = data;
   return (
     <div className="cards-grid">
       {categories.map(c => (
-        <div className="stat-card" key={c.id}>
+        <div className="stat-card" key={c.CategoryID}>
           <div className="top">
-            <span className="lab" style={{fontSize:11,color:"var(--muted)"}} >{c.id}</span>
+            <span className="lab" style={{fontSize:11,color:"var(--muted)"}}>CAT-{String(c.CategoryID).padStart(2,"0")}</span>
             <div className="ic">{icons.categories}</div>
           </div>
-          <div className="num" style={{fontSize:20}}>{c.name}</div>
-          <div className="lab">{c.desc}</div>
+          <div className="num" style={{fontSize:20}}>{c.CategoryName}</div>
+          <div className="lab">{c.Description}</div>
           <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid var(--line)",display:"flex",justifyContent:"space-between"}}>
             <span className="lab">Units</span>
-            <span className="mono" style={{fontSize:13}}>{c.count}</span>
+            <span className="mono" style={{fontSize:13}}>{inventory.filter(i => i.CategoryName === c.CategoryName).length}</span>
           </div>
         </div>
       ))}
@@ -179,10 +189,11 @@ function CategoriesPage() {
   );
 }
 
-function InventoryPage() {
+function InventoryPage({ data }) {
+  const { inventory } = data;
   const [filter, setFilter] = useState("All");
   const statuses = ["All","Available","Rented","Maintenance"];
-  const rows = inventory.filter(i => filter === "All" || i.status === filter);
+  const rows = inventory.filter(i => filter === "All" || i.Status === filter);
   return (
     <>
       <div className="pill-row">
@@ -195,12 +206,12 @@ function InventoryPage() {
           <thead><tr><th>Serial No.</th><th>Item</th><th>Category</th><th>Condition</th><th>Status</th></tr></thead>
           <tbody>
             {rows.map(i => (
-              <tr key={i.sn}>
-                <td className="mono-cell">{i.sn}</td>
-                <td className="empty-name">{i.item}</td>
-                <td>{i.cat}</td>
-                <td>{i.condition}</td>
-                <td><Chip tone={statusTone(i.status)}>{i.status}</Chip></td>
+              <tr key={i.SerialNumber}>
+                <td className="mono-cell">{i.SerialNumber}</td>
+                <td className="empty-name">{i.ItemName}</td>
+                <td>{i.CategoryName}</td>
+                <td>{i.ConditionStatus}</td>
+                <td><Chip tone={statusTone(i.Status)}>{i.Status}</Chip></td>
               </tr>
             ))}
           </tbody>
@@ -210,19 +221,20 @@ function InventoryPage() {
   );
 }
 
-function CustomersPage() {
+function CustomersPage({ data }) {
+  const { customers } = data;
   return (
     <Frame>
       <table>
         <thead><tr><th>Customer ID</th><th>Name</th><th>ID Type</th><th>Contact</th><th>Verification</th></tr></thead>
         <tbody>
           {customers.map(c => (
-            <tr key={c.id}>
-              <td className="mono-cell">{c.id}</td>
-              <td className="empty-name">{c.name}</td>
-              <td>{c.idType}</td>
-              <td className="mono-cell">{c.contact}</td>
-              <td><Chip tone={c.verified ? "green":"rose"}>{c.verified ? "Verified" : "Pending"}</Chip></td>
+            <tr key={c.CustomerID}>
+              <td className="mono-cell">CUS-{String(c.CustomerID).padStart(3,"0")}</td>
+              <td className="empty-name">{c.FullName}</td>
+              <td>{c.IDType}</td>
+              <td className="mono-cell">{c.ContactNumber}</td>
+              <td><Chip tone={Number(c.Verified) ? "green":"rose"}>{Number(c.Verified) ? "Verified" : "Pending"}</Chip></td>
             </tr>
           ))}
         </tbody>
@@ -231,44 +243,43 @@ function CustomersPage() {
   );
 }
 
-function RentalsPage() {
+function RentalsPage({ data }) {
+  const { rentals } = data;
   return (
     <Frame>
       <table>
         <thead><tr><th>Rental ID</th><th>Customer</th><th>Item</th><th>Date out</th><th>Expected back</th><th>Actual return</th><th>Status</th></tr></thead>
         <tbody>
-          {rentals.map(r => {
-            const status = r.returned ? "Done" : "Rented";
-            return (
-              <tr key={r.id}>
-                <td className="mono-cell">{r.id}</td>
-                <td>{r.customer}</td>
-                <td>{r.item}</td>
-                <td className="mono-cell">{r.out}</td>
-                <td className="mono-cell">{r.expected}</td>
-                <td className="mono-cell">{r.returned || "—"}</td>
-                <td><Chip tone={statusTone(status)}>{r.returned ? "Returned" : "On loan"}</Chip></td>
-              </tr>
-            );
-          })}
+          {rentals.map(r => (
+            <tr key={r.RentalID}>
+              <td className="mono-cell">RNT-{r.RentalID}</td>
+              <td>{r.Customer}</td>
+              <td>{r.Item}</td>
+              <td className="mono-cell">{fmtDate(r.DateOut)}</td>
+              <td className="mono-cell">{fmtDate(r.ExpectedBack)}</td>
+              <td className="mono-cell">{r.ActualReturn ? fmtDate(r.ActualReturn) : "—"}</td>
+              <td><Chip tone={statusTone(r.ActualReturn ? "Done" : "Rented")}>{r.ActualReturn ? "Returned" : "On loan"}</Chip></td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </Frame>
   );
 }
 
-function DepositsPage() {
+function DepositsPage({ data }) {
+  const { deposits } = data;
   return (
     <Frame>
       <table>
         <thead><tr><th>Deposit ID</th><th>Linked Rental</th><th>Amount</th><th>Refund Status</th></tr></thead>
         <tbody>
           {deposits.map(d => (
-            <tr key={d.id}>
-              <td className="mono-cell">{d.id}</td>
-              <td className="mono-cell">{d.rental}</td>
-              <td className="mono-cell">₱{d.amount.toLocaleString()}</td>
-              <td><Chip tone={statusTone(d.status)}>{d.status}</Chip></td>
+            <tr key={d.DepositID}>
+              <td className="mono-cell">DEP-{d.DepositID}</td>
+              <td className="mono-cell">RNT-{d.RentalID}</td>
+              <td className="mono-cell">₱{Number(d.AmountHeld).toLocaleString()}</td>
+              <td><Chip tone={statusTone(d.RefundStatus)}>{d.RefundStatus}</Chip></td>
             </tr>
           ))}
         </tbody>
@@ -290,8 +301,15 @@ const pages = {
 
 function App() {
   const [page, setPage] = useState("dashboard");
+  const data = useApiData();
   const Page = pages[page];
   const meta = pageMeta[page];
+
+  const activeRentals = data.rentals.filter(r => !r.ActualReturn);
+  const overdueCount = activeRentals.filter(r => new Date(r.ExpectedBack) < new Date()).length;
+  const heldTotal = data.deposits
+    .filter(d => d.RefundStatus === "Held")
+    .reduce((a, d) => a + Number(d.AmountHeld), 0);
 
   return (
     <div className="app">
@@ -314,7 +332,7 @@ function App() {
         </nav>
         <div className="sidebar-foot">
           <div className="label">SHOP STATUS</div>
-          <div className="val">36 units · 4 categories</div>
+          <div className="val">{data.inventory.length} units · {data.categories.length} categories</div>
         </div>
       </aside>
 
@@ -324,15 +342,17 @@ function App() {
             <div className="topbar-title">{meta.title}</div>
             <div className="topbar-desc">{meta.desc}</div>
             <div className="readout">
-              <div className="readout-cell"><div className="l">In stock</div><div className="v">36</div></div>
-              <div className="readout-cell"><div className="l">On loan</div><div className="v">{rentals.filter(r=>!r.returned).length}</div></div>
-              <div className="readout-cell"><div className="l">Overdue</div><div className="v">1</div></div>
-              <div className="readout-cell"><div className="l">Held ₱</div><div className="v">20,000</div></div>
+              <div className="readout-cell"><div className="l">In stock</div><div className="v">{data.inventory.length}</div></div>
+              <div className="readout-cell"><div className="l">On loan</div><div className="v">{activeRentals.length}</div></div>
+              <div className="readout-cell"><div className="l">Overdue</div><div className="v">{overdueCount}</div></div>
+              <div className="readout-cell"><div className="l">Held ₱</div><div className="v">{heldTotal.toLocaleString()}</div></div>
             </div>
           </div>
         </header>
         <main className="content">
-          <Page />
+          {data.loading && <p style={{color:"var(--muted)"}}>Loading live data from the server…</p>}
+          {data.error && <p style={{color:"var(--rose)"}}>{data.error}</p>}
+          {!data.loading && !data.error && <Page data={data} />}
         </main>
       </div>
     </div>

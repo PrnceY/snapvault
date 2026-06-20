@@ -1,9 +1,13 @@
-function CategoriesPage({ data }) {
+function CategoriesPage({ data, setPage, setCategoryFilter }) {
   const { categories, inventory } = data;
+  const openCategory = (categoryName) => {
+    setCategoryFilter(categoryName);
+    setPage("inventory");
+  };
   return (
     <div className="cards-grid">
       {categories.map(c => (
-        <div className="stat-card" key={c.CategoryID}>
+        <div className="stat-card clickable" key={c.CategoryID} onClick={() => openCategory(c.CategoryName)}>
           <div className="top">
             <span className="lab" style={{fontSize:11,color:"var(--muted)"}}>CAT-{String(c.CategoryID).padStart(2,"0")}</span>
             <div className="ic">{icons.categories}</div>

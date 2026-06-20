@@ -13,8 +13,8 @@ function useApiData() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    Promise.all([
+  const fetchAll = () => {
+    return Promise.all([
       fetch("get_categories.php").then(r => r.json()),
       fetch("get_inventory.php").then(r => r.json()),
       fetch("get_customers.php").then(r => r.json()),
@@ -34,9 +34,13 @@ function useApiData() {
         setError("Could not load data from the server. Check that the PHP endpoints are uploaded and db_connect.php has the right credentials.");
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchAll();
   }, []);
 
-  return { categories, inventory, customers, rentals, deposits, loading, error };
+  return { categories, inventory, customers, rentals, deposits, loading, error, refetch: fetchAll };
 }
 
 /* ---------------- Small components ---------------- */
@@ -64,6 +68,49 @@ function Frame({ children, style }) {
     </div>
   );
 }
+
+function Modal({ title, onClose, children }) {
+  return (
+    <div style={{
+      position:"fixed", inset:0, background:"rgba(10,9,13,0.6)",
+      display:"flex", alignItems:"center", justifyContent:"center", zIndex:50,
+    }} onClick={onClose}>
+      <div
+        style={{
+          background:"var(--card)", border:"1px solid var(--line)", borderRadius:14,
+          padding:"22px 24px", width:380, maxWidth:"90vw",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16}}>
+          <h2 style={{fontFamily:"'Space Grotesk',sans-serif", fontSize:16, margin:0}}>{title}</h2>
+          <span style={{cursor:"pointer", color:"var(--muted)", fontSize:18}} onClick={onClose}>×</span>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function FormField({ label, children }) {
+  return (
+    <div style={{marginBottom:12}}>
+      <label style={{display:"block", fontSize:11.5, color:"var(--muted)", marginBottom:5, textTransform:"uppercase", letterSpacing:0.3}}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+const inputStyle = {
+  width:"100%", background:"var(--card-hover)", border:"1px solid var(--line)",
+  borderRadius:8, padding:"9px 11px", color:"var(--text)", fontSize:13.5,
+  fontFamily:"'Inter',sans-serif", outline:"none",
+};
+
+const buttonStyle = {
+  width:"100%", padding:"10px", borderRadius:9, border:"none", cursor:"pointer",
+  background:"var(--amber)", color:"#1A1320", fontWeight:600, fontSize:13.5, marginTop:6,
+};
 
 function ApertureIcon() {
   return (
@@ -190,16 +237,53 @@ function CategoriesPage({ data }) {
 }
 
 function InventoryPage({ data }) {
-  const { inventory } = data;
+  const { inventory, categories, refetch } = data;
   const [filter, setFilter] = useState("All");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ SerialNumber:"", CategoryID:"", ItemName:"", ConditionStatus:"Good", Status:"Available" });
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState(null);
   const statuses = ["All","Available","Rented","Maintenance"];
   const rows = inventory.filter(i => filter === "All" || i.Status === filter);
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!form.SerialNumber || !form.CategoryID || !form.ItemName) {
+      setFormError("Serial number, category, and item name are required.");
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    fetch("add_inventory.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    })
+      .then(r => r.json())
+      .then(res => {
+        setSaving(false);
+        if (res.success) {
+          setShowForm(false);
+          setForm({ SerialNumber:"", CategoryID:"", ItemName:"", ConditionStatus:"Good", Status:"Available" });
+          refetch();
+        } else {
+          setFormError(res.error || "Something went wrong.");
+        }
+      })
+      .catch(() => { setSaving(false); setFormError("Could not reach the server."); });
+  };
+
   return (
     <>
-      <div className="pill-row">
-        {statuses.map(s => (
-          <div key={s} className={`pill ${filter===s ? "on":""}`} onClick={() => setFilter(s)}>{s}</div>
-        ))}
+      <div className="pill-row" style={{justifyContent:"space-between", display:"flex"}}>
+        <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+          {statuses.map(s => (
+            <div key={s} className={`pill ${filter===s ? "on":""}`} onClick={() => setFilter(s)}>{s}</div>
+          ))}
+        </div>
+        <div className="pill" style={{background:"var(--amber)", color:"#1A1320", borderColor:"var(--amber)", fontWeight:600}} onClick={() => setShowForm(true)}>
+          + Add Item
+        </div>
       </div>
       <Frame>
         <table>
@@ -217,29 +301,125 @@ function InventoryPage({ data }) {
           </tbody>
         </table>
       </Frame>
+
+      {showForm && (
+        <Modal title="Add Inventory Item" onClose={() => setShowForm(false)}>
+          <form onSubmit={submit}>
+            <FormField label="Serial Number">
+              <input style={inputStyle} value={form.SerialNumber} onChange={e => setForm({...form, SerialNumber:e.target.value})} placeholder="e.g. CR5-0099" />
+            </FormField>
+            <FormField label="Item Name">
+              <input style={inputStyle} value={form.ItemName} onChange={e => setForm({...form, ItemName:e.target.value})} placeholder="e.g. Canon EOS R6" />
+            </FormField>
+            <FormField label="Category">
+              <select style={inputStyle} value={form.CategoryID} onChange={e => setForm({...form, CategoryID:e.target.value})}>
+                <option value="">Select a category</option>
+                {categories.map(c => <option key={c.CategoryID} value={c.CategoryID}>{c.CategoryName}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Condition">
+              <select style={inputStyle} value={form.ConditionStatus} onChange={e => setForm({...form, ConditionStatus:e.target.value})}>
+                <option>Excellent</option><option>Good</option><option>Fair</option><option>Damaged</option>
+              </select>
+            </FormField>
+            <FormField label="Status">
+              <select style={inputStyle} value={form.Status} onChange={e => setForm({...form, Status:e.target.value})}>
+                <option>Available</option><option>Rented</option><option>Maintenance</option>
+              </select>
+            </FormField>
+            {formError && <p style={{color:"var(--rose)", fontSize:12.5, marginTop:4}}>{formError}</p>}
+            <button type="submit" style={buttonStyle} disabled={saving}>{saving ? "Saving…" : "Add to Inventory"}</button>
+          </form>
+        </Modal>
+      )}
     </>
   );
 }
 
 function CustomersPage({ data }) {
-  const { customers } = data;
+  const { customers, refetch } = data;
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ FullName:"", IDType:"School ID", ContactNumber:"", Verified:false });
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState(null);
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!form.FullName) {
+      setFormError("Full name is required.");
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    fetch("add_customer.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    })
+      .then(r => r.json())
+      .then(res => {
+        setSaving(false);
+        if (res.success) {
+          setShowForm(false);
+          setForm({ FullName:"", IDType:"School ID", ContactNumber:"", Verified:false });
+          refetch();
+        } else {
+          setFormError(res.error || "Something went wrong.");
+        }
+      })
+      .catch(() => { setSaving(false); setFormError("Could not reach the server."); });
+  };
+
   return (
-    <Frame>
-      <table>
-        <thead><tr><th>Customer ID</th><th>Name</th><th>ID Type</th><th>Contact</th><th>Verification</th></tr></thead>
-        <tbody>
-          {customers.map(c => (
-            <tr key={c.CustomerID}>
-              <td className="mono-cell">CUS-{String(c.CustomerID).padStart(3,"0")}</td>
-              <td className="empty-name">{c.FullName}</td>
-              <td>{c.IDType}</td>
-              <td className="mono-cell">{c.ContactNumber}</td>
-              <td><Chip tone={Number(c.Verified) ? "green":"rose"}>{Number(c.Verified) ? "Verified" : "Pending"}</Chip></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Frame>
+    <>
+      <div className="pill-row" style={{justifyContent:"flex-end", display:"flex"}}>
+        <div className="pill" style={{background:"var(--amber)", color:"#1A1320", borderColor:"var(--amber)", fontWeight:600}} onClick={() => setShowForm(true)}>
+          + Add Customer
+        </div>
+      </div>
+      <Frame>
+        <table>
+          <thead><tr><th>Customer ID</th><th>Name</th><th>ID Type</th><th>Contact</th><th>Verification</th></tr></thead>
+          <tbody>
+            {customers.map(c => (
+              <tr key={c.CustomerID}>
+                <td className="mono-cell">CUS-{String(c.CustomerID).padStart(3,"0")}</td>
+                <td className="empty-name">{c.FullName}</td>
+                <td>{c.IDType}</td>
+                <td className="mono-cell">{c.ContactNumber}</td>
+                <td><Chip tone={Number(c.Verified) ? "green":"rose"}>{Number(c.Verified) ? "Verified" : "Pending"}</Chip></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Frame>
+
+      {showForm && (
+        <Modal title="Add Customer" onClose={() => setShowForm(false)}>
+          <form onSubmit={submit}>
+            <FormField label="Full Name">
+              <input style={inputStyle} value={form.FullName} onChange={e => setForm({...form, FullName:e.target.value})} placeholder="e.g. Juan Dela Cruz" />
+            </FormField>
+            <FormField label="ID Type">
+              <select style={inputStyle} value={form.IDType} onChange={e => setForm({...form, IDType:e.target.value})}>
+                <option>School ID</option><option>Driver's License</option><option>Passport</option>
+              </select>
+            </FormField>
+            <FormField label="Contact Number">
+              <input style={inputStyle} value={form.ContactNumber} onChange={e => setForm({...form, ContactNumber:e.target.value})} placeholder="e.g. 0917 000 0000" />
+            </FormField>
+            <FormField label="Verified">
+              <label style={{display:"flex", alignItems:"center", gap:8, fontSize:13}}>
+                <input type="checkbox" checked={form.Verified} onChange={e => setForm({...form, Verified:e.target.checked})} />
+                ID has been verified
+              </label>
+            </FormField>
+            {formError && <p style={{color:"var(--rose)", fontSize:12.5, marginTop:4}}>{formError}</p>}
+            <button type="submit" style={buttonStyle} disabled={saving}>{saving ? "Saving…" : "Add Customer"}</button>
+          </form>
+        </Modal>
+      )}
+    </>
   );
 }
 

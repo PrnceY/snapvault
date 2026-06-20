@@ -44,7 +44,6 @@ function App() {
         <header className="topbar">
           <div className="topbar-inner">
             <div className="topbar-title">{meta.title}</div>
-            <div className="topbar-desc">{meta.desc}</div>
           </div>
         </header>
         <main className="content">

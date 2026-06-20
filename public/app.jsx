@@ -497,7 +497,7 @@ function App() {
         <div className="brand">
           <div className="brand-mark"><ApertureIcon /></div>
           <div className="brand-text">
-            <span className="name">ƒ/STOCK</span>
+            <span className="name">SnapVault</span>
             <span className="sub">GEAR RENTAL LOG</span>
           </div>
         </div>

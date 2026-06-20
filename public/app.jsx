@@ -60,7 +60,7 @@ function App() {
         <main className="content">
           {data.loading && <p style={{color:"var(--muted)"}}>Loading live data from the server…</p>}
           {data.error && <p style={{color:"var(--rose)"}}>{data.error}</p>}
-          {!data.loading && !data.error && <Page data={data} />}
+          {!data.loading && !data.error && <Page data={data} setPage={setPage} />}
         </main>
       </div>
     </div>

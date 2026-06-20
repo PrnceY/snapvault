@@ -1,4 +1,4 @@
-function Dashboard({ data }) {
+function Dashboard({ data, setPage }) {
   const { inventory, rentals, deposits } = data;
   const activeRentals = rentals.filter(r => !r.ActualReturn);
   const now = new Date();
@@ -10,22 +10,22 @@ function Dashboard({ data }) {
   return (
     <>
       <div className="cards-grid">
-        <div className="stat-card">
+        <div className="stat-card clickable" onClick={() => setPage("inventory")}>
           <div className="top"><span className="lab" style={{fontSize:12,color:"var(--muted)"}}>Units in stock</span><div className="ic">{icons.inventory}</div></div>
           <div className="num">{inventory.length}</div>
           <div className="lab">Across all categories</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card clickable" onClick={() => setPage("rentals")}>
           <div className="top"><span className="lab" style={{fontSize:12,color:"var(--muted)"}}>Active rentals</span><div className="ic">{icons.rentals}</div></div>
           <div className="num">{activeRentals.length}</div>
           <div className="lab">Currently checked out</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card clickable" onClick={() => setPage("rentals")}>
           <div className="top"><span className="lab" style={{fontSize:12,color:"var(--muted)"}}>Overdue</span><div className="ic">{icons.rentals}</div></div>
           <div className="num" style={{color:"var(--rose)"}}>{overdue}</div>
           <div className="lab">Past expected return</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card clickable" onClick={() => setPage("deposits")}>
           <div className="top"><span className="lab" style={{fontSize:12,color:"var(--muted)"}}>Deposits held</span><div className="ic">{icons.deposits}</div></div>
           <div className="num">₱{heldTotal.toLocaleString()}</div>
           <div className="lab">Not yet refunded</div>

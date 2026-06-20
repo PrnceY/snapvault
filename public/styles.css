@@ -59,7 +59,7 @@
   .main{flex:1;min-width:0;display:flex;flex-direction:column;}
 
   .topbar{
-    background:var(--grad);padding:22px 32px 20px 32px;position:relative;overflow:hidden;
+    background:var(--grad);padding:18px 32px;position:relative;overflow:hidden;
   }
   .topbar::after{
     content:"";position:absolute;inset:0;
@@ -68,16 +68,6 @@
   .topbar-inner{position:relative;z-index:1;}
   .topbar-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;color:#1A1320;letter-spacing:-0.2px;}
   .topbar-desc{font-size:12.5px;color:rgba(20,15,25,0.72);margin-top:3px;font-weight:500;}
-
-  .readout{
-    display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;
-  }
-  .readout-cell{
-    background:rgba(16,14,20,0.32);border:1px solid rgba(255,255,255,0.22);
-    border-radius:10px;padding:10px 16px;min-width:128px;backdrop-filter:blur(2px);
-  }
-  .readout-cell .l{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:0.7px;color:rgba(20,15,25,0.65);text-transform:uppercase;}
-  .readout-cell .v{font-family:'IBM Plex Mono',monospace;font-size:18px;color:#1A1320;font-weight:500;margin-top:3px;}
 
   .content{flex:1;padding:28px 32px 40px 32px;overflow:auto;}
 
@@ -162,5 +152,5 @@
     .sidebar{display:none;}
     .cards-grid{grid-template-columns:repeat(2,1fr);}
     .content{padding:20px;}
-    .topbar{padding:18px 20px;}
+    .topbar{padding:16px 20px;}
   }

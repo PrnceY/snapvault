@@ -98,6 +98,8 @@
   tbody td{padding:13px 16px;border-bottom:1px solid var(--line);vertical-align:middle;color:var(--text);}
   tbody tr:last-child td{border-bottom:none;}
   tbody tr:hover{background:rgba(255,255,255,0.018);}
+  tbody tr.row-clickable{cursor:pointer;}
+  tbody tr.row-clickable:hover{background:rgba(255,180,84,0.05);}
   .mono-cell{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);}
 
   .thumb{

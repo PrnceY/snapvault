@@ -10,6 +10,7 @@ const pages = {
 function App() {
   const [page, setPage] = useState("dashboard");
   const [categoryFilter, setCategoryFilter] = useState("All");
+  const [rentalFilter, setRentalFilter] = useState("All");
   const data = useApiData();
   const Page = pages[page];
   const meta = pageMeta[page];
@@ -50,7 +51,14 @@ function App() {
           {data.loading && <p style={{color:"var(--muted)"}}>Loading live data from the server…</p>}
           {data.error && <p style={{color:"var(--rose)"}}>{data.error}</p>}
           {!data.loading && !data.error && (
-            <Page data={data} setPage={setPage} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} />
+            <Page
+              data={data}
+              setPage={setPage}
+              categoryFilter={categoryFilter}
+              setCategoryFilter={setCategoryFilter}
+              rentalFilter={rentalFilter}
+              setRentalFilter={setRentalFilter}
+            />
           )}
         </main>
       </div>

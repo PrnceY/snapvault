@@ -1,4 +1,4 @@
-function Dashboard({ data, setPage }) {
+function Dashboard({ data, setPage, setRentalFilter }) {
   const { inventory, rentals, deposits } = data;
   const activeRentals = rentals.filter(r => !r.ActualReturn);
   const now = new Date();
@@ -15,12 +15,12 @@ function Dashboard({ data, setPage }) {
           <div className="num">{inventory.length}</div>
           <div className="lab">Across all categories</div>
         </div>
-        <div className="stat-card clickable" onClick={() => setPage("rentals")}>
+        <div className="stat-card clickable" onClick={() => { setRentalFilter("On Loan"); setPage("rentals"); }}>
           <div className="top"><span className="lab" style={{fontSize:12,color:"var(--muted)"}}>Active rentals</span><div className="ic">{icons.rentals}</div></div>
           <div className="num">{activeRentals.length}</div>
           <div className="lab">Currently checked out</div>
         </div>
-        <div className="stat-card clickable" onClick={() => setPage("rentals")}>
+        <div className="stat-card clickable" onClick={() => { setRentalFilter("On Loan"); setPage("rentals"); }}>
           <div className="top"><span className="lab" style={{fontSize:12,color:"var(--muted)"}}>Overdue</span><div className="ic">{icons.rentals}</div></div>
           <div className="num" style={{color:"var(--rose)"}}>{overdue}</div>
           <div className="lab">Past expected return</div>
@@ -40,7 +40,11 @@ function Dashboard({ data, setPage }) {
             {activeRentals.map(r => {
               const isOverdue = new Date(r.ExpectedBack) < now;
               return (
-                <tr key={r.RentalID}>
+                <tr
+                  key={r.RentalID}
+                  className="row-clickable"
+                  onClick={() => { setRentalFilter("On Loan"); setPage("rentals"); }}
+                >
                   <td className="mono-cell">RNT-{r.RentalID}</td>
                   <td>{r.Customer}</td>
                   <td>{r.Item}</td>

@@ -1,6 +1,5 @@
-function RentalsPage({ data }) {
+function RentalsPage({ data, rentalFilter, setRentalFilter }) {
   const { rentals, customers, inventory, refetch } = data;
-  const [filter, setFilter] = useState("All");
   const [showForm, setShowForm] = useState(false);
   const [returningId, setReturningId] = useState(null);
   const [form, setForm] = useState({ CustomerID:"", SerialNumber:"", ExpectedBack:"", DepositAmount:"" });
@@ -11,8 +10,8 @@ function RentalsPage({ data }) {
 
   const availableItems = inventory.filter(i => i.Status === "Available");
   const rows = rentals.filter(r => {
-    if (filter === "All") return true;
-    return filter === "On Loan" ? !r.ActualReturn : !!r.ActualReturn;
+    if (rentalFilter === "All") return true;
+    return rentalFilter === "On Loan" ? !r.ActualReturn : !!r.ActualReturn;
   });
 
   const submitRental = (e) => {
@@ -68,7 +67,7 @@ function RentalsPage({ data }) {
       <div className="pill-row" style={{justifyContent:"space-between", display:"flex", flexWrap:"wrap", gap:10}}>
         <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
           {filters.map(f => (
-            <div key={f} className={`pill ${filter===f ? "on":""}`} onClick={() => setFilter(f)}>{f}</div>
+            <div key={f} className={`pill ${rentalFilter===f ? "on":""}`} onClick={() => setRentalFilter(f)}>{f}</div>
           ))}
         </div>
         <div className="pill" style={{background:"var(--amber)", color:"#1A1320", borderColor:"var(--amber)", fontWeight:600}} onClick={() => setShowForm(true)}>

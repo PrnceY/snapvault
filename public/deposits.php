@@ -1,7 +1,7 @@
 <?php
 include 'db_connect.php';
 
-$sql = "SELECT CustomerID, FullName, IDType, ContactNumber, Verified FROM Customers";
+$sql = "SELECT DepositID, RentalID, AmountHeld, RefundStatus FROM Deposits";
 $result = $conn->query($sql);
 
 $rows = [];

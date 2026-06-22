@@ -1,7 +1,7 @@
 <?php
 include 'db_connect.php';
 
-$sql = "SELECT DepositID, RentalID, AmountHeld, RefundStatus FROM Deposits";
+$sql = "SELECT CategoryID, CategoryName, Description FROM Equipment_Categories";
 $result = $conn->query($sql);
 
 $rows = [];

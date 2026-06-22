@@ -13,11 +13,11 @@ function useApiData() {
 
   const fetchAll = () => {
     return Promise.all([
-      fetch("get_categories.php").then(r => r.json()),
-      fetch("get_inventory.php").then(r => r.json()),
-      fetch("get_customers.php").then(r => r.json()),
-      fetch("get_rentals.php").then(r => r.json()),
-      fetch("get_deposits.php").then(r => r.json()),
+      fetch("categories.php").then(r => r.json()),
+      fetch("inventory.php").then(r => r.json()),
+      fetch("customers.php").then(r => r.json()),
+      fetch("rentals.php").then(r => r.json()),
+      fetch("deposits.php").then(r => r.json()),
     ])
       .then(([cat, inv, cus, ren, dep]) => {
         setCategories(cat);

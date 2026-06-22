@@ -7,12 +7,15 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
   const [deletingItem, setDeletingItem] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
-  const statuses = ["All","Available","Rented","Maintenance"];
+  const statuses = ["All","Available","Rented","Maintenance","Archived"];
   const categoryOptions = ["All", ...categories.map(c => c.CategoryName)];
-  const rows = inventory.filter(i =>
-    (filter === "All" || i.Status === filter) &&
-    (categoryFilter === "All" || i.CategoryName === categoryFilter)
-  );
+  const rows = inventory.filter(i => {
+    const isArchived = Number(i.Archived) === 1;
+    const matchesCategory = categoryFilter === "All" || i.CategoryName === categoryFilter;
+    if (filter === "Archived") return isArchived && matchesCategory;
+    if (isArchived) return false;
+    return (filter === "All" || i.Status === filter) && matchesCategory;
+  });
 
   const submit = (e) => {
     e.preventDefault();
@@ -45,6 +48,17 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
         }
       })
       .catch(() => { setSaving(false); setFormError("Could not reach the server."); });
+  };
+
+  const restoreItem = (serial) => {
+    fetch("restore_inventory.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ SerialNumber: serial }),
+    })
+      .then(r => r.json())
+      .then(res => { if (res.success) refetch(); })
+      .catch(() => {});
   };
 
   const confirmDelete = () => {
@@ -102,12 +116,19 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
                 <td>{i.ConditionStatus}</td>
                 <td><Chip tone={statusTone(i.Status)}>{i.Status}</Chip></td>
                 <td>
-                  {i.Status !== "Rented" && (
+                  {Number(i.Archived) === 1 ? (
+                    <span
+                      style={{fontSize:11.5, color:"var(--amber)", cursor:"pointer", fontWeight:600}}
+                      onClick={() => restoreItem(i.SerialNumber)}
+                    >
+                      Restore
+                    </span>
+                  ) : i.Status !== "Rented" && (
                     <span
                       style={{fontSize:11.5, color:"var(--rose)", cursor:"pointer", fontWeight:600}}
                       onClick={() => { setDeletingItem(i); setFormError(null); }}
                     >
-                      Delete
+                      Archive
                     </span>
                   )}
                 </td>
@@ -165,9 +186,9 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
       )}
 
       {deletingItem && (
-        <Modal title="Delete Item" onClose={() => setDeletingItem(null)}>
+        <Modal title="Archive Item" onClose={() => setDeletingItem(null)}>
           <p style={{fontSize:13.5, color:"var(--muted)", marginBottom:16}}>
-            Remove <strong style={{color:"var(--text)"}}>{deletingItem.ItemName}</strong> ({deletingItem.SerialNumber}) from inventory? This can't be undone.
+            Archive <strong style={{color:"var(--text)"}}>{deletingItem.ItemName}</strong> ({deletingItem.SerialNumber})? It'll be hidden from inventory but its rental history stays intact.
           </p>
           {formError && <p style={{color:"var(--rose)", fontSize:12.5, marginBottom:10}}>{formError}</p>}
           <button
@@ -175,7 +196,7 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
             disabled={saving}
             onClick={confirmDelete}
           >
-            {saving ? "Deleting…" : "Delete Permanently"}
+            {saving ? "Archiving…" : "Archive Item"}
           </button>
         </Modal>
       )}

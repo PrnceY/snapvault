@@ -2,21 +2,943 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>SnapVault — Photography Equipment Rental</title>
+<title>SnapVault — Sign In</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-<link rel="stylesheet" href="styles.css" />
+<style>
+:root {
+  --bg: #15141B;
+  --card: #1E1C26;
+  --card-hover: #262430;
+  --line: #2C2A36;
+  --text: #F3EFE6;
+  --muted: #9C97A8;
+  --amber: #FFB454;
+  --grad: linear-gradient(135deg, #FFCB8E 0%, #FFB454 100%);
+  --green: #4ADE80;
+  --rose: #FB7185;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Layout ── */
+.page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 480px;
+}
+
+/* ── Left panel ── */
+.left {
+  background: #100F15;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.brand-mark {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--amber);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.brand-mark svg { width: 20px; height: 20px; }
+
+.brand-text .name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700; font-size: 17px; letter-spacing: 0.3px;
+  display: block;
+}
+.brand-text .sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; color: var(--muted);
+  letter-spacing: 0.6px; margin-top: 2px;
+  display: block;
+}
+
+/* ── Left scrollable content ── */
+.left-section {
+  padding: 48px 56px;
+}
+
+.left-section.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+}
+
+.left-section.hero::before {
+  content: "";
+  position: absolute;
+  top: -120px; left: -120px;
+  width: 520px; height: 520px;
+  background: radial-gradient(circle, rgba(255,180,84,0.07) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.left-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255,180,84,0.1);
+  border: 1px solid rgba(255,180,84,0.25);
+  border-radius: 100px;
+  padding: 5px 13px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--amber);
+  letter-spacing: 0.5px;
+  width: fit-content;
+  margin-bottom: 28px;
+}
+
+.left-tag span {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--amber);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.left-headline {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.5px;
+  margin-bottom: 18px;
+}
+
+.left-headline em {
+  font-style: normal;
+  background: var(--grad);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.left-desc {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.7;
+  max-width: 400px;
+  margin-bottom: 48px;
+}
+
+.stats-row {
+  display: flex;
+  gap: 36px;
+}
+
+.stat .num {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--amber);
+}
+.stat .lab {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* ── Category section ── */
+.left-section.catalog {
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+
+.section-eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--amber);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.section-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 28px;
+}
+
+.cat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.cat-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color .2s, transform .2s;
+  cursor: default;
+}
+
+.cat-card:hover {
+  border-color: rgba(255,180,84,0.4);
+  transform: translateY(-2px);
+}
+
+.cat-img {
+  width: 100%;
+  height: 140px;
+  background: var(--card-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.cat-img svg {
+  width: 48px; height: 48px;
+  color: var(--muted);
+  opacity: 0.4;
+}
+
+.cat-body {
+  padding: 14px 16px;
+}
+
+.cat-avail {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--amber);
+  margin-bottom: 4px;
+}
+
+.cat-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.cat-desc {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ── Features section ── */
+.left-section.features {
+  background: #100F15;
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  margin-top: 28px;
+  text-align: left;
+}
+
+.feat-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 16px;
+}
+
+.feat-icon {
+  width: 36px; height: 36px;
+  background: var(--card-hover);
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+}
+
+.feat-icon svg { width: 18px; height: 18px; color: var(--amber); }
+
+.feat-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.feat-desc {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ── Footer ── */
+.left-footer {
+  background: #0D0C12;
+  border-top: 1px solid var(--line);
+  padding: 36px 56px;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 40px;
+  align-items: start;
+}
+
+.footer-brand .name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+
+.footer-brand .name-mark {
+  width: 28px; height: 28px;
+  background: var(--card);
+  border: 1.5px solid var(--amber);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.footer-brand .name-mark svg { width: 14px; height: 14px; }
+
+.footer-brand p {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 220px;
+  margin-bottom: 6px;
+}
+
+.footer-brand .copy {
+  font-size: 11px;
+  color: var(--line);
+}
+
+.footer-col h4 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.footer-col a {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  margin-bottom: 8px;
+  transition: color .15s;
+}
+
+.footer-col a:hover { color: var(--amber); }
+
+/* ── Right panel ── */
+.right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+  background: var(--bg);
+}
+
+.right-inner {
+  width: 100%;
+  max-width: 360px;
+}
+
+.right-head {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.right-head h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.right-head p {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* role toggle */
+.role-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 28px;
+  gap: 4px;
+}
+
+.role-btn {
+  padding: 10px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: background .15s, color .15s;
+}
+
+.role-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+.role-btn.active {
+  background: var(--amber);
+  color: #1A1320;
+  font-weight: 600;
+}
+
+/* form */
+.field {
+  margin-bottom: 14px;
+}
+
+.field label {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.field input {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 11px 13px;
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+  transition: border-color .15s;
+}
+
+.field input:focus {
+  border-color: var(--amber);
+}
+
+.field input::placeholder { color: var(--muted); }
+
+.field-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.field-row label {
+  margin-bottom: 0;
+}
+.forgot {
+  font-size: 11.5px;
+  color: var(--amber);
+  text-decoration: none;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.forgot:hover { opacity: 0.75; }
+
+.pw-wrap {
+  position: relative;
+}
+.pw-wrap input { padding-right: 40px; }
+.pw-toggle {
+  position: absolute;
+  right: 12px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none;
+  color: var(--muted); cursor: pointer;
+  display: flex; align-items: center;
+  padding: 0;
+}
+.pw-toggle:hover { color: var(--text); }
+.pw-toggle svg { width: 16px; height: 16px; }
+
+.submit-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 9px;
+  border: none;
+  cursor: pointer;
+  background: var(--grad);
+  color: #1A1320;
+  font-weight: 700;
+  font-size: 14px;
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: 0.2px;
+  margin-top: 8px;
+  transition: opacity .15s, transform .1s;
+  position: relative;
+  overflow: hidden;
+}
+
+.submit-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 60% -10%, rgba(255,255,255,0.2), transparent 60%);
+}
+
+.submit-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.submit-btn:active { transform: translateY(0); }
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+}
+.divider span {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.divider p {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.register-link {
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.register-link a {
+  color: var(--amber);
+  text-decoration: none;
+  font-weight: 600;
+}
+.register-link a:hover { opacity: 0.75; }
+
+/* role badge shown below form */
+.role-badge {
+  margin-top: 24px;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.role-badge svg { width: 14px; height: 14px; color: var(--amber); flex-shrink: 0; }
+
+/* error message */
+.error-msg {
+  background: rgba(251,113,133,0.1);
+  border: 1px solid rgba(251,113,133,0.3);
+  border-radius: 8px;
+  padding: 9px 13px;
+  font-size: 12.5px;
+  color: var(--rose);
+  margin-bottom: 14px;
+  display: none;
+}
+.error-msg.visible { display: block; }
+
+@media (max-width: 860px) {
+  .page { grid-template-columns: 1fr; }
+  .left { display: none; }
+  .right { padding: 40px 24px; }
+}
+</style>
 </head>
 <body>
-<div id="root"></div>
 
-<!-- Order matters: shared helpers first, then each page, then App.jsx last (it renders) -->
-<script type="text/babel" src="shared.jsx"></script>
-<script type="text/babel" src="pages.jsx"></script>
-<script type="text/babel" src="app.jsx"></script>
+<div class="page">
+
+  <!-- ── Left panel (scrollable landing) ── -->
+  <div class="left">
+
+    <!-- Hero section -->
+    <div class="left-section hero">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#FFB454" stroke-width="1.6">
+            <polygon points="12,2 19,6.5 19,15.5 12,20 5,15.5 5,6.5" />
+            <circle cx="12" cy="11" r="3.2" />
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="name">SnapVault</span>
+          <span class="sub">GEAR RENTAL LOG</span>
+        </div>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 80px;">
+        <div class="left-tag">
+          <span></span>
+          SYSTEM ACTIVE
+        </div>
+
+        <h2 class="left-headline">
+          Professional<br>
+          Photography<br>
+          <em>Equipment Rentals</em>
+        </h2>
+
+        <p class="left-desc">
+          Access world-class cameras, lenses, tripods, and lighting.
+          Managed rentals with deposit tracking, ID verification,
+          and real-time availability.
+        </p>
+
+        <div class="stats-row">
+          <div class="stat">
+            <div class="num" id="stat-units">—</div>
+            <div class="lab">Equipment Units</div>
+          </div>
+          <div class="stat">
+            <div class="num">2,400+</div>
+            <div class="lab">Successful Rentals</div>
+          </div>
+          <div class="stat">
+            <div class="num">4.9★</div>
+            <div class="lab">Customer Rating</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Category catalog section -->
+    <div class="left-section catalog">
+      <div class="section-eyebrow">EQUIPMENT CATALOG</div>
+      <div class="section-title">Browse by Category</div>
+
+      <div class="cat-grid" id="cat-grid">
+        <!-- Populated by JS from categories.php + inventory.php -->
+        <div class="cat-card">
+          <div class="cat-img">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><circle cx="12" cy="13" r="2.5"/></svg>
+          </div>
+          <div class="cat-body">
+            <div class="cat-avail">Loading…</div>
+            <div class="cat-name">Camera Bodies</div>
+            <div class="cat-desc">Full frame, mirrorless & DSLR systems</div>
+          </div>
+        </div>
+        <div class="cat-card">
+          <div class="cat-img">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          </div>
+          <div class="cat-body">
+            <div class="cat-avail">Loading…</div>
+            <div class="cat-name">Lenses</div>
+            <div class="cat-desc">Prime, zoom, tilt-shift & specialty glass</div>
+          </div>
+        </div>
+        <div class="cat-card">
+          <div class="cat-img">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2v20M2 7l10-5 10 5M2 17l10 5 10-5"/></svg>
+          </div>
+          <div class="cat-body">
+            <div class="cat-avail">Loading…</div>
+            <div class="cat-name">Tripods</div>
+            <div class="cat-desc">Carbon fiber, aluminum & travel systems</div>
+          </div>
+        </div>
+        <div class="cat-card">
+          <div class="cat-img">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          </div>
+          <div class="cat-body">
+            <div class="cat-avail">Loading…</div>
+            <div class="cat-name">Lighting Equipment</div>
+            <div class="cat-desc">Studio strobes, continuous & portable flash</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Features section -->
+    <div class="left-section features">
+      <div class="section-eyebrow" style="text-align:center;">WHY SNAPVAULT</div>
+      <div class="section-title" style="text-align:center; font-size:28px;">Built for Professional<br>Photographers</div>
+
+      <div class="features-grid">
+        <div class="feat-card">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="feat-title">Verified Rentals</div>
+          <div class="feat-desc">Every rental includes government ID verification and a refundable deposit tracked in real time.</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div class="feat-title">Condition Guaranteed</div>
+          <div class="feat-desc">All equipment inspected before and after each rental with our 5-point condition grading system.</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+          </div>
+          <div class="feat-title">Compatibility Checker</div>
+          <div class="feat-desc">Instantly verify which lenses are compatible with your selected camera body before you rent.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="left-footer">
+      <div class="footer-brand">
+        <div class="name">
+          <div class="name-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#FFB454" stroke-width="1.6">
+              <polygon points="12,2 19,6.5 19,15.5 12,20 5,15.5 5,6.5" />
+              <circle cx="12" cy="11" r="3.2" />
+            </svg>
+          </div>
+          SnapVault
+        </div>
+        <p>Photography Equipment Rental Management System</p>
+        <span class="copy">© 2024 SnapVault. All rights reserved.</span>
+      </div>
+      <div class="footer-col">
+        <h4>Platform</h4>
+        <a href="#">Browse Equipment</a>
+        <a href="#">Compatibility Checker</a>
+        <a href="#">Rental Agreement</a>
+        <a href="#">Customer Portal</a>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <a href="#">About Us</a>
+        <a href="#">Contact</a>
+        <a href="#">Privacy Policy</a>
+        <a href="#">Terms of Service</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Right panel ── -->
+  <div class="right">
+    <div class="right-inner">
+
+      <div class="right-head">
+        <h1>Welcome back</h1>
+        <p>Sign in to your SnapVault account</p>
+      </div>
+
+      <!-- Role toggle -->
+      <div class="role-toggle">
+        <button class="role-btn active" id="btn-customer" onclick="setRole('customer')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+            <circle cx="12" cy="8" r="3.5"/>
+            <path d="M4.5 20c1-3.8 4-6 7.5-6s6.5 2.2 7.5 6"/>
+          </svg>
+          Customer
+        </button>
+        <button class="role-btn" id="btn-admin" onclick="setRole('admin')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+            <rect x="3" y="3" width="7" height="9" rx="1.5"/>
+            <rect x="14" y="3" width="7" height="5" rx="1.5"/>
+            <rect x="14" y="12" width="7" height="9" rx="1.5"/>
+            <rect x="3" y="16" width="7" height="5" rx="1.5"/>
+          </svg>
+          Admin
+        </button>
+      </div>
+
+      <!-- Error -->
+      <div class="error-msg" id="error-msg">
+        Invalid credentials. Please check your details and try again.
+      </div>
+
+      <!-- Form -->
+      <div class="field">
+        <label>Email address</label>
+        <input type="email" id="input-email" placeholder="you@example.com" autocomplete="email" />
+      </div>
+
+      <div class="field">
+        <div class="field-row">
+          <label>Password</label>
+          <a href="#" class="forgot">Forgot password?</a>
+        </div>
+        <div class="pw-wrap">
+          <input type="password" id="input-pw" placeholder="••••••••" autocomplete="current-password" />
+          <button class="pw-toggle" onclick="togglePw()" type="button" tabindex="-1">
+            <svg id="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <button class="submit-btn" onclick="handleSignIn()">
+        Sign In
+      </button>
+
+      <div class="divider">
+        <span></span><p>OR</p><span></span>
+      </div>
+
+      <div class="register-link" id="register-area">
+        New customer?
+        <a href="#">Create an account</a>
+      </div>
+
+      <div class="role-badge" id="role-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+          <circle cx="12" cy="8" r="3.5"/>
+          <path d="M4.5 20c1-3.8 4-6 7.5-6s6.5 2.2 7.5 6"/>
+        </svg>
+        <span id="role-badge-text">Signing in as Customer — access to equipment catalog and rental history.</span>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let currentRole = 'customer';
+  let pwVisible = false;
+
+  const roleMeta = {
+    customer: {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c1-3.8 4-6 7.5-6s6.5 2.2 7.5 6"/></svg>`,
+      text: 'Signing in as Customer — access to equipment catalog and rental history.',
+      registerHtml: 'New customer? <a href="#">Create an account</a>',
+      redirect: 'customer.html',
+    },
+    admin: {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>`,
+      text: 'Signing in as Admin — full access to inventory, rentals, deposits, and audit logs.',
+      registerHtml: 'Need admin access? <a href="#">Contact system owner</a>',
+      redirect: 'index.html',
+    },
+  };
+
+  function setRole(role) {
+    currentRole = role;
+    document.getElementById('btn-customer').classList.toggle('active', role === 'customer');
+    document.getElementById('btn-admin').classList.toggle('active', role === 'admin');
+
+    const meta = roleMeta[role];
+    document.getElementById('role-badge').querySelector('svg').outerHTML; // noop
+    document.getElementById('role-badge').innerHTML = meta.icon + `<span id="role-badge-text">${meta.text}</span>`;
+    document.getElementById('register-area').innerHTML = meta.registerHtml;
+    document.getElementById('error-msg').classList.remove('visible');
+  }
+
+  function togglePw() {
+    pwVisible = !pwVisible;
+    const inp = document.getElementById('input-pw');
+    inp.type = pwVisible ? 'text' : 'password';
+    document.getElementById('eye-icon').innerHTML = pwVisible
+      ? `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>`
+      : `<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>`;
+  }
+
+  async function handleSignIn() {
+    const email = document.getElementById('input-email').value.trim();
+    const pw = document.getElementById('input-pw').value;
+    const errEl = document.getElementById('error-msg');
+    const btn = document.querySelector('.submit-btn');
+
+    if (!email || !pw) {
+      errEl.textContent = 'Please fill in both email and password.';
+      errEl.classList.add('visible');
+      return;
+    }
+
+    errEl.classList.remove('visible');
+    btn.textContent = 'Signing in…';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch('auth.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pw }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        errEl.textContent = data.error || 'Invalid email or password.';
+        errEl.classList.add('visible');
+        btn.textContent = 'Sign In';
+        btn.disabled = false;
+        return;
+      }
+
+      window.location.href = data.role === 'admin' ? 'dashboard.html' : 'customer.html';
+    } catch (e) {
+      errEl.textContent = 'Could not reach the server. Try again.';
+      errEl.classList.add('visible');
+      btn.textContent = 'Sign In';
+      btn.disabled = false;
+    }
+  }
+
+  // Allow Enter key to submit
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleSignIn();
+  });
+
+  // Pull live unit count from the API if accessible
+  fetch('inventory.php')
+    .then(r => r.json())
+    .then(data => {
+      const active = Array.isArray(data) ? data.filter(i => !i.Archived || i.Archived == 0) : [];
+      document.getElementById('stat-units').textContent = active.length + '+';
+    })
+    .catch(() => {
+      document.getElementById('stat-units').textContent = '17+';
+    });
+</script>
+
 </body>
 </html>

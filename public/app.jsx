@@ -1,10 +1,13 @@
 const pages = {
-  dashboard: Dashboard,
-  categories: CategoriesPage,
-  inventory: InventoryPage,
-  customers: CustomersPage,
-  rentals: RentalsPage,
-  deposits: DepositsPage,
+  dashboard:     Dashboard,
+  categories:    CategoriesPage,
+  inventory:     InventoryPage,
+  customers:     CustomersPage,
+  rentals:       RentalsPage,
+  deposits:      DepositsPage,
+  compatibility: CompatibilityPage,
+  reports:       ReportsPage,
+  auditlogs:     AuditLogsPage,
 };
 
 function App() {
@@ -37,6 +40,25 @@ function App() {
         <div className="sidebar-foot">
           <div className="label">SHOP STATUS</div>
           <div className="val">{data.inventory.length} units · {data.categories.length} categories</div>
+          <button
+            onClick={() => { fetch('session_check.php').finally(() => { window.location.href = 'index.html'; }); }}
+            style={{
+              display:"flex", alignItems:"center", gap:9, marginTop:14,
+              width:"100%", padding:"9px 10px", borderRadius:9, border:"none",
+              background:"none", cursor:"pointer", color:"var(--muted)",
+              fontSize:13, fontWeight:500, fontFamily:"'Inter',sans-serif",
+              transition:"background .15s, color .15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background="var(--card-hover)"; e.currentTarget.style.color="var(--rose)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background="none"; e.currentTarget.style.color="var(--muted)"; }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Sign Out
+          </button>
         </div>
       </aside>
 

@@ -69,19 +69,24 @@ function CustomerApp() {
   const [page, setPage]         = useState('dashboard');
   const [profile, setProfile]   = useState(null);
   const [rentals, setRentals]   = useState([]);
-  const [available, setAvailable] = useState(0);
-  const [loading, setLoading]   = useState(true);
+  const [available, setAvailable]   = useState(0);
+  const [inventory, setInventory]   = useState([]);
+  const [custCategories, setCustCategories] = useState([]);
+  const [loading, setLoading]       = useState(true);
 
   useEffect(() => {
-    fetch('customer_data.php')
-      .then(r => r.json())
-      .then(d => {
-        setProfile(d.customer);
-        setRentals(d.rentals || []);
-        setAvailable(d.availableCount || 0);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    Promise.all([
+      fetch('customer_data.php').then(r => r.json()),
+      fetch('inventory.php').then(r => r.json()),
+      fetch('categories.php').then(r => r.json()),
+    ]).then(([d, inv, cats]) => {
+      setProfile(d.customer);
+      setRentals(d.rentals || []);
+      setAvailable(d.availableCount || 0);
+      setInventory(inv.filter(i => !i.Archived || Number(i.Archived) === 0));
+      setCustCategories(cats);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
 
   const activeRentals   = rentals.filter(r => !r.ActualReturn);
@@ -100,11 +105,11 @@ function CustomerApp() {
   const firstName  = profile?.FullName?.split(' ')[0] || 'there';
 
   const navItems = [
-    { key: 'dashboard',   label: 'Dashboard',            icon: icons.dashboard },
-    { key: 'catalog',     label: 'Equipment Catalog',    icon: icons.inventory },
-    { key: 'compat',      label: 'Compatibility Checker',icon: icons.categories },
-    { key: 'rent',        label: 'Rent Equipment',       icon: icons.rentals },
-    { key: 'profile',     label: 'My Profile',           icon: icons.customers },
+    { key: 'dashboard', label: 'Dashboard',             icon: icons.dashboard },
+    { key: 'catalog',   label: 'Equipment Catalog',     icon: icons.inventory },
+    { key: 'compat',    label: 'Compatibility Checker', icon: icons.compatibility },
+    { key: 'rent',      label: 'Rent Equipment',        icon: icons.rentals },
+    { key: 'profile',   label: 'My Profile',            icon: icons.customers },
   ];
 
   function signOut() {
@@ -302,14 +307,422 @@ function CustomerApp() {
             </>
           )}
 
-          {!loading && page !== 'dashboard' && (
-            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:300,gap:12,color:'var(--muted)'}}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.4"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              <span style={{fontSize:14}}>This section is coming soon.</span>
-            </div>
-          )}
+          {!loading && page === 'catalog'   && <CustomerCatalog data={{inventory, categories: custCategories}} />}
+          {!loading && page === 'compat'    && <CustomerCompat  data={{inventory}} />}
+          {!loading && page === 'rent'      && <CustomerRent    data={{inventory}} profile={profile} onSuccess={() => setPage('dashboard')} refetch={() => fetch('customer_data.php').then(r=>r.json()).then(d=>{setRentals(d.rentals||[]);setAvailable(d.availableCount||0);})} />}
+          {!loading && page === 'profile'   && <CustomerProfile profile={profile} rentals={rentals} />}
         </main>
       </div>
+    </div>
+  );
+}
+
+/* ── Rental rate helper (derived from serial prefix / name) ── */
+function getRentalRate(item) {
+  const n = item.ItemName.toLowerCase();
+  if (n.includes('canon eos 5d'))   return 2500;
+  if (n.includes('sony a7r'))       return 3500;
+  if (n.includes('nikon z9'))       return 4000;
+  if (n.includes('fujifilm x-t5'))  return 2000;
+  if (n.includes('70-200'))         return 1200;
+  if (n.includes('50mm f/1.4 usm')) return 600;
+  if (n.includes('sigma 35'))       return 800;
+  if (n.includes('24-70'))          return 1500;
+  if (n.includes('85mm f/1.4 gm')) return 1300;
+  if (n.includes('nikkor z 24-70')) return 1400;
+  if (n.includes('nikkor z 85'))    return 900;
+  if (n.includes('fujifilm xf 23')) return 700;
+  if (n.includes('tripod') || n.includes('manfrotto') || n.includes('gitzo')) return 500;
+  if (n.includes('profoto') || n.includes('godox') || n.includes('light')) return 1800;
+  return 800;
+}
+
+function getBrand(name) {
+  const l = name.toLowerCase();
+  if (l.startsWith('canon'))    return 'Canon';
+  if (l.startsWith('sony'))     return 'Sony';
+  if (l.startsWith('nikon'))    return 'Nikon';
+  if (l.startsWith('fuji'))     return 'Fujifilm';
+  if (l.startsWith('sigma'))    return 'Sigma';
+  if (l.startsWith('godox'))    return 'Godox';
+  if (l.startsWith('profoto'))  return 'Profoto';
+  if (l.startsWith('manfrotto'))return 'Manfrotto';
+  if (l.startsWith('gitzo'))    return 'Gitzo';
+  return 'Other';
+}
+
+/* ── 1. Equipment Catalog ── */
+function CustomerCatalog({ data }) {
+  const { inventory, categories } = data;
+  const [search, setSearch]     = useState('');
+  const [catFilter, setCatFilter]   = useState('All');
+  const [availFilter, setAvailFilter] = useState('All');
+  const [brandFilter, setBrandFilter] = useState('All');
+
+  const brands = [...new Set(inventory.map(i => getBrand(i.ItemName)))].sort();
+
+  const filtered = inventory.filter(i => {
+    if (catFilter !== 'All'   && i.CategoryName !== catFilter) return false;
+    if (availFilter !== 'All' && i.Status !== availFilter)     return false;
+    if (brandFilter !== 'All' && getBrand(i.ItemName) !== brandFilter) return false;
+    if (search && !i.ItemName.toLowerCase().includes(search.toLowerCase()) && !i.SerialNumber.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const condTone = c => c === 'Excellent' ? 'green' : c === 'Good' ? 'amber' : 'rose';
+  const availTone = s => s === 'Available' ? 'green' : s === 'Rented' ? 'amber' : 'rose';
+
+  const sideLabel = { fontSize:10, color:'var(--muted)', fontFamily:"'IBM Plex Mono',monospace", letterSpacing:0.8, textTransform:'uppercase', marginBottom:10, marginTop:18 };
+  const filterLink = (active, onClick, label) => (
+    <div onClick={onClick} style={{ fontSize:13, cursor:'pointer', color: active ? 'var(--amber)' : 'var(--muted)', fontWeight: active ? 600 : 400, padding:'3px 0', transition:'color .15s' }}>{label}</div>
+  );
+
+  return (
+    <div style={{display:'flex', gap:0, minHeight:'100%'}}>
+      {/* Sidebar filters */}
+      <div style={{width:160, flexShrink:0, paddingRight:24}}>
+        <div style={sideLabel}>Category</div>
+        {filterLink(catFilter==='All', ()=>setCatFilter('All'), 'All')}
+        {categories.map(c => filterLink(catFilter===c.CategoryName, ()=>setCatFilter(c.CategoryName), c.CategoryName))}
+        <div style={sideLabel}>Availability</div>
+        {['All','Available','Rented','Maintenance'].map(s => filterLink(availFilter===s, ()=>setAvailFilter(s), s))}
+        <div style={sideLabel}>Brand</div>
+        {filterLink(brandFilter==='All', ()=>setBrandFilter('All'), 'All')}
+        {brands.map(b => filterLink(brandFilter===b, ()=>setBrandFilter(b), b))}
+      </div>
+
+      {/* Main grid */}
+      <div style={{flex:1, minWidth:0}}>
+        <div style={{position:'relative', marginBottom:18}}>
+          <svg style={{position:'absolute',left:13,top:'50%',transform:'translateY(-50%)',width:15,height:15,color:'var(--muted)'}} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search equipment…" style={{...inputStyle, paddingLeft:38, width:'100%'}} />
+        </div>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14}}>
+          {filtered.map(item => (
+            <div key={item.SerialNumber} style={{background:'var(--card)', border:'1px solid var(--line)', borderRadius:14, overflow:'hidden', transition:'border-color .2s, transform .2s', cursor:'pointer'}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(255,180,84,0.4)';e.currentTarget.style.transform='translateY(-2px)';}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--line)';e.currentTarget.style.transform='none';}}
+            >
+              <div style={{height:160, background:'var(--card-hover)', overflow:'hidden', position:'relative'}}>
+                {item.ImagePath
+                  ? <img src={item.ImagePath} alt={item.ItemName} style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                  : <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--muted)',opacity:0.3}}>
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><circle cx="12" cy="13" r="2.5"/></svg>
+                    </div>
+                }
+                <div style={{position:'absolute',top:10,right:10}}><Chip tone={availTone(item.Status)}>{item.Status}</Chip></div>
+              </div>
+              <div style={{padding:'14px 16px'}}>
+                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:14,marginBottom:3}}>{item.ItemName}</div>
+                <div style={{fontSize:11.5,color:'var(--muted)',marginBottom:10}}>{item.CategoryName} · {getBrand(item.ItemName)}</div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:13,color:'var(--amber)',fontWeight:600}}>₱{getRentalRate(item).toLocaleString()}<span style={{color:'var(--muted)',fontWeight:400}}>/day</span></span>
+                  <Chip tone={condTone(item.ConditionStatus)}>{item.ConditionStatus}</Chip>
+                </div>
+              </div>
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div style={{gridColumn:'1/-1',textAlign:'center',color:'var(--muted)',padding:40,fontSize:13}}>No equipment matches your filters.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── 2. Compatibility Checker ── */
+function CustomerCompat({ data }) {
+  const { inventory } = data;
+  const bodies  = inventory.filter(i => i.CategoryName === 'Camera Bodies');
+  const lenses  = inventory.filter(i => i.CategoryName === 'Lenses');
+  const [selBody,  setSelBody]  = useState('');
+  const [selLens,  setSelLens]  = useState('');
+
+  function compatible(body, lens) { return getBrand(body.ItemName) === getBrand(lens.ItemName); }
+
+  const resultItems = selBody
+    ? lenses.filter(l => compatible(bodies.find(b=>b.SerialNumber===selBody), l))
+    : selLens
+    ? bodies.filter(b => compatible(b, lenses.find(l=>l.SerialNumber===selLens)))
+    : [];
+
+  const availTone = s => s === 'Available' ? 'green' : s === 'Rented' ? 'amber' : 'rose';
+
+  return (
+    <div style={{maxWidth:780}}>
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'24px 26px',marginBottom:18}}>
+        <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:18,marginBottom:6}}>Lens–Camera Compatibility Checker</div>
+        <div style={{fontSize:13,color:'var(--muted)',marginBottom:22}}>Select a camera body or a lens to see what is compatible in our current inventory.</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+          <div>
+            <label style={{display:'block',fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:7}}>Select Camera Body</label>
+            <select value={selBody} onChange={e=>{setSelBody(e.target.value);setSelLens('');}} style={{...inputStyle}}>
+              <option value="">— Choose camera body —</option>
+              {bodies.map(b=><option key={b.SerialNumber} value={b.SerialNumber}>{b.ItemName}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{display:'block',fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:7}}>Or Select a Lens</label>
+            <select value={selLens} onChange={e=>{setSelLens(e.target.value);setSelBody('');}} style={{...inputStyle}}>
+              <option value="">— Choose lens —</option>
+              {lenses.map(l=><option key={l.SerialNumber} value={l.SerialNumber}>{l.ItemName}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {resultItems.length > 0 && (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+          {resultItems.map(item=>(
+            <div key={item.SerialNumber} style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:'16px'}}>
+              <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{item.ItemName}</div>
+              <div style={{fontSize:11.5,color:'var(--muted)',marginBottom:10}}>{item.CategoryName}</div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:'var(--amber)'}}>₱{getRentalRate(item).toLocaleString()}/day</span>
+                <Chip tone={availTone(item.Status)}>{item.Status}</Chip>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── 3. Rent Equipment (4-step wizard) ── */
+function CustomerRent({ data, profile, onSuccess, refetch }) {
+  const { inventory } = data;
+  const available = inventory.filter(i => i.Status === 'Available');
+  const [step, setStep]   = useState(1);
+  const [selItem, setSelItem] = useState(null);
+  const [days, setDays]   = useState(1);
+  const [agreed, setAgreed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [refNum, setRefNum] = useState(null);
+  const [err, setErr]     = useState(null);
+
+  const durations = [1,3,5,7,14,30];
+  const rate      = selItem ? getRentalRate(selItem) : 0;
+  const deposit   = selItem ? rate * 2 : 0;
+  const totalCost = rate * days;
+
+  function getExpectedBack() {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
+  }
+
+  function submitRental() {
+    if (!profile) return;
+    setSaving(true);
+    setErr(null);
+    fetch('rentals.php', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        action:'create',
+        CustomerID: profile.CustomerID,
+        SerialNumber: selItem.SerialNumber,
+        ExpectedBack: getExpectedBack(),
+        DepositAmount: deposit,
+      }),
+    })
+      .then(r=>r.json())
+      .then(res=>{
+        setSaving(false);
+        if (res.success) { setRefNum(res.RentalID); setStep(4); refetch(); }
+        else setErr(res.error || 'Something went wrong.');
+      })
+      .catch(()=>{ setSaving(false); setErr('Could not reach the server.'); });
+  }
+
+  const stepLabels = ['Select Equipment','Duration & Cost','Agreement','Submitted'];
+  const stepStyle = (s) => ({
+    display:'flex', alignItems:'center', gap:6, fontSize:12.5, fontWeight: step===s ? 600 : 400,
+    color: step>=s ? (step===s ? 'var(--amber)' : 'var(--green)') : 'var(--muted)',
+  });
+  const circleStyle = (s) => ({
+    width:24, height:24, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+    fontSize:11, fontWeight:700, flexShrink:0,
+    background: step>s ? 'var(--green)' : step===s ? 'var(--amber)' : 'var(--line)',
+    color: step>=s ? '#1A1320' : 'var(--muted)',
+  });
+
+  return (
+    <div style={{maxWidth:640}}>
+      {/* Step indicator */}
+      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:28,flexWrap:'wrap'}}>
+        {stepLabels.map((label,i)=>(
+          <React.Fragment key={i}>
+            <div style={stepStyle(i+1)}>
+              <div style={circleStyle(i+1)}>{step>i+1 ? '✓' : i+1}</div>
+              {label}
+            </div>
+            {i < stepLabels.length-1 && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--line)" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'24px 26px'}}>
+        {/* Step 1 */}
+        {step===1 && (
+          <>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:17,marginBottom:18}}>Select Equipment</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:20}}>
+              {available.map(item=>(
+                <div key={item.SerialNumber} onClick={()=>setSelItem(item)}
+                  style={{padding:'14px 16px',borderRadius:10,border:`1px solid ${selItem?.SerialNumber===item.SerialNumber?'var(--amber)':'var(--line)'}`,background:selItem?.SerialNumber===item.SerialNumber?'rgba(255,180,84,0.07)':'var(--card-hover)',cursor:'pointer',transition:'border-color .15s'}}>
+                  <div style={{fontWeight:600,fontSize:13}}>{item.ItemName}</div>
+                  <div style={{fontSize:11.5,color:'var(--muted)',margin:'3px 0 8px'}}>{item.CategoryName}</div>
+                  <div style={{fontSize:12,color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace"}}>₱{getRentalRate(item).toLocaleString()}/day</div>
+                </div>
+              ))}
+              {available.length===0 && <div style={{gridColumn:'1/-1',color:'var(--muted)',fontSize:13}}>No equipment available right now.</div>}
+            </div>
+            <button disabled={!selItem} onClick={()=>setStep(2)} style={{...buttonStyle, opacity:selItem?1:0.4}}>Continue to Duration</button>
+          </>
+        )}
+
+        {/* Step 2 */}
+        {step===2 && (
+          <>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:17,marginBottom:4}}>Duration & Cost</div>
+            <div style={{fontSize:13,color:'var(--muted)',marginBottom:18}}>Renting: <strong style={{color:'var(--text)'}}>{selItem?.ItemName}</strong></div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:20}}>
+              {durations.map(d=>(
+                <div key={d} onClick={()=>setDays(d)}
+                  className={`pill ${days===d?'on':''}`}
+                  style={{minWidth:52,textAlign:'center'}}>{d} day{d>1?'s':''}</div>
+              ))}
+            </div>
+            <div style={{background:'var(--card-hover)',border:'1px solid var(--line)',borderRadius:10,padding:'16px 18px',marginBottom:20}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:8,fontSize:13}}><span style={{color:'var(--muted)'}}>Rental Rate</span><span style={{fontFamily:"'IBM Plex Mono',monospace"}}>₱{rate.toLocaleString()}/day</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:8,fontSize:13}}><span style={{color:'var(--muted)'}}>Duration</span><span style={{fontFamily:"'IBM Plex Mono',monospace"}}>{days} day{days>1?'s':''}</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:8,fontSize:13}}><span style={{color:'var(--muted)'}}>Security Deposit</span><span style={{fontFamily:"'IBM Plex Mono',monospace"}}>₱{deposit.toLocaleString()}</span></div>
+              <div style={{borderTop:'1px solid var(--line)',marginTop:10,paddingTop:10,display:'flex',justifyContent:'space-between',fontWeight:700,fontSize:15}}>
+                <span>Total Cost</span><span style={{color:'var(--amber)'}}>₱{totalCost.toLocaleString()}</span>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={()=>setStep(1)} style={{...buttonStyle,background:'var(--card-hover)',color:'var(--text)',flex:1}}>Back</button>
+              <button onClick={()=>setStep(3)} style={{...buttonStyle,flex:2}}>Review Agreement</button>
+            </div>
+          </>
+        )}
+
+        {/* Step 3 */}
+        {step===3 && (
+          <>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:17,marginBottom:16}}>Rental Agreement</div>
+            <div style={{background:'var(--card-hover)',border:'1px solid var(--line)',borderRadius:10,padding:'16px 18px',fontSize:12.5,lineHeight:1.8,color:'var(--muted)',marginBottom:18,maxHeight:220,overflowY:'auto'}}>
+              <p><strong style={{color:'var(--text)'}}>1. Equipment Condition</strong><br/>The renter agrees to return equipment in the same condition as received. Damage beyond normal wear will be charged against the security deposit.</p>
+              <p><strong style={{color:'var(--text)'}}>2. Return Policy</strong><br/>Equipment must be returned by the agreed return date. Late returns are subject to additional daily rental charges.</p>
+              <p><strong style={{color:'var(--text)'}}>3. Security Deposit</strong><br/>A refundable deposit of ₱{deposit.toLocaleString()} is required. It will be refunded within 3-5 business days after inspection upon return.</p>
+              <p><strong style={{color:'var(--text)'}}>4. Liability</strong><br/>The renter is responsible for loss, theft, or damage to equipment during the rental period.</p>
+              <p><strong style={{color:'var(--text)'}}>5. ID Verification</strong><br/>A valid government-issued ID must be presented at pickup.</p>
+            </div>
+            <label style={{display:'flex',alignItems:'center',gap:10,fontSize:13,cursor:'pointer',marginBottom:18}}>
+              <input type="checkbox" checked={agreed} onChange={e=>setAgreed(e.target.checked)} style={{width:16,height:16,accentColor:'var(--amber)'}} />
+              I have read and agree to the rental agreement terms.
+            </label>
+            {err && <div style={{color:'var(--rose)',fontSize:12.5,marginBottom:10}}>{err}</div>}
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={()=>setStep(2)} style={{...buttonStyle,background:'var(--card-hover)',color:'var(--text)',flex:1}}>Back</button>
+              <button disabled={!agreed||saving} onClick={submitRental} style={{...buttonStyle,flex:2,opacity:agreed?1:0.4}}>{saving?'Submitting…':'Submit Rental Request'}</button>
+            </div>
+          </>
+        )}
+
+        {/* Step 4 */}
+        {step===4 && (
+          <div style={{textAlign:'center',padding:'20px 0'}}>
+            <div style={{width:56,height:56,borderRadius:'50%',background:'rgba(74,222,128,0.12)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px'}}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:18,marginBottom:8}}>Request Submitted!</div>
+            <div style={{fontSize:13,color:'var(--muted)',marginBottom:16}}>Your reference number is</div>
+            <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:18,color:'var(--amber)',fontWeight:600,marginBottom:20}}>
+              RNT-{String(refNum||'').padStart(7,'0').replace(/^(\d{4})(\d+)/,'$1-$2')}
+            </div>
+            <button onClick={onSuccess} style={buttonStyle}>Back to Dashboard</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── 4. My Profile ── */
+function CustomerProfile({ profile, rentals }) {
+  if (!profile) return <div style={{color:'var(--muted)',fontSize:13}}>Loading profile…</div>;
+
+  function getInitials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+
+  const deposits = rentals.filter(r => r.AmountHeld);
+  const depTone  = s => s === 'Full Refund' ? 'green' : s === 'Held' ? 'amber' : s === 'Forfeited' ? 'rose' : 'muted';
+  const depLabel = s => s === 'Full Refund' ? 'Refunded' : s;
+
+  return (
+    <div style={{maxWidth:640}}>
+      {/* Profile card */}
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'26px 28px',marginBottom:16}}>
+        <div style={{display:'flex',alignItems:'center',gap:18,marginBottom:22}}>
+          <div style={{width:60,height:60,borderRadius:'50%',background:'var(--amber)',color:'#1A1320',fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+            {getInitials(profile.FullName)}
+          </div>
+          <div>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:20}}>{profile.FullName}</div>
+            <div style={{fontSize:13,color:'var(--muted)',marginTop:2}}>Customer ID: C-{String(profile.CustomerID).padStart(3,'0')}</div>
+            {profile.Verified
+              ? <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12.5,color:'var(--green)',marginTop:4}}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  Government ID Verified
+                </div>
+              : <div style={{fontSize:12.5,color:'var(--amber)',marginTop:4}}>⚠ ID Not Yet Verified</div>
+            }
+          </div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+          {[
+            { icon:'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z M22 6l-10 7L2 6', label:'Contact', value: profile.ContactNumber || '—' },
+            { icon:'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 15.1 19.79 19.79 0 0 1 1.57 6.5 2 2 0 0 1 3.54 4.36h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 12a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 18.92z', label:'Phone', value: profile.ContactNumber || '—' },
+            { icon:'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z', label:'ID Type', value: profile.IDType || '—' },
+            { icon:'M3 7l9-4 9 4-9 4-9-4z M3 7v10l9 4 9-4V7 M12 11v10', label:'Total Rentals', value: `${rentals.length} completed` },
+          ].map((f,i) => (
+            <div key={i}>
+              <div style={{fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:5}}>{f.label}</div>
+              <div style={{fontSize:14,fontWeight:500}}>{f.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Deposit history */}
+      {deposits.length > 0 && (
+        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'20px 22px'}}>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:15,marginBottom:16}}>Deposit History</div>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead>
+              <tr>
+                {['Deposit ID','Rental ID','Amount','Status'].map(h=>(
+                  <th key={h} style={{textAlign:'left',fontFamily:"'IBM Plex Mono',monospace",fontSize:10.5,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,padding:'8px 12px',borderBottom:'1px solid var(--line)'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {deposits.map((r,i)=>(
+                <tr key={i}>
+                  <td style={{padding:'12px',borderBottom:'1px solid var(--line)',color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12}}>DEP-{String(r.RentalID).padStart(7,'0').replace(/^(\d{4})(\d+)/,'2024-$2')}</td>
+                  <td style={{padding:'12px',borderBottom:'1px solid var(--line)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:'var(--muted)'}}>RNT-{String(r.RentalID).padStart(7,'0').replace(/^(\d{4})(\d+)/,'2024-$2')}</td>
+                  <td style={{padding:'12px',borderBottom:'1px solid var(--line)',fontFamily:"'IBM Plex Mono',monospace",fontSize:13}}>₱{parseFloat(r.AmountHeld||0).toLocaleString()}</td>
+                  <td style={{padding:'12px',borderBottom:'1px solid var(--line)'}}><Chip tone={depTone(r.RefundStatus)}>{depLabel(r.RefundStatus)}</Chip></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

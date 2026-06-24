@@ -708,3 +708,274 @@ function DepositsPage({ data }) {
     </>
   );
 }
+
+function CompatibilityPage({ data }) {
+  const { inventory } = data;
+  const cameraBodies = inventory.filter(i => i.CategoryName === "Camera Bodies" && !i.Archived && i.Status !== "Archived");
+  const lenses       = inventory.filter(i => i.CategoryName === "Lenses"        && !i.Archived && i.Status !== "Archived");
+
+  // Simple brand-based compatibility: same brand = compatible
+  function getBrand(name) {
+    const lower = name.toLowerCase();
+    if (lower.startsWith("canon"))   return "Canon";
+    if (lower.startsWith("sony"))    return "Sony";
+    if (lower.startsWith("nikon"))   return "Nikon";
+    if (lower.startsWith("fuji"))    return "Fujifilm";
+    if (lower.startsWith("sigma"))   return "Sigma";
+    return "Other";
+  }
+  function isCompatible(body, lens) {
+    return getBrand(body.ItemName) === getBrand(lens.ItemName);
+  }
+
+  const checkIcon = (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.2">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+      <polyline points="22 4 12 14.01 9 11.01"/>
+    </svg>
+  );
+
+  const thStyle = { textAlign:"left", fontFamily:"'IBM Plex Mono',monospace", fontSize:10.5, letterSpacing:0.5, color:"var(--muted)", textTransform:"uppercase", fontWeight:500, padding:"12px 16px", borderBottom:"1px solid var(--line)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:120 };
+  const tdStyle = { padding:"13px 16px", borderBottom:"1px solid var(--line)", textAlign:"center", verticalAlign:"middle" };
+
+  return (
+    <>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18}}>
+        <div>
+          <div style={{fontSize:12.5, color:"var(--muted)", marginTop:3}}>Manage camera-lens compatibility. Changes reflect in the customer portal.</div>
+        </div>
+        <div className="pill" style={{background:"var(--amber)", color:"#1A1320", borderColor:"var(--amber)", fontWeight:600, cursor:"default"}}>
+          + Add Compatibility
+        </div>
+      </div>
+      <Frame>
+        <div style={{overflowX:"auto"}}>
+          <table style={{minWidth: 500}}>
+            <thead>
+              <tr>
+                <th style={{...thStyle, textAlign:"left"}}>Camera Body</th>
+                {lenses.map(l => (
+                  <th key={l.SerialNumber} style={thStyle} title={l.ItemName}>
+                    {l.ItemName.length > 14 ? l.ItemName.slice(0,14)+"…" : l.ItemName}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {cameraBodies.map(body => (
+                <tr key={body.SerialNumber}>
+                  <td style={{...tdStyle, textAlign:"left", fontWeight:500, fontSize:13}}>{body.ItemName}</td>
+                  {lenses.map(lens => (
+                    <td key={lens.SerialNumber} style={tdStyle}>
+                      {isCompatible(body, lens) ? checkIcon : <span style={{color:"var(--line)"}}>·</span>}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {cameraBodies.length === 0 && (
+                <tr><td colSpan={lenses.length + 1} style={{color:"var(--muted)", textAlign:"center", padding:24}}>No camera bodies in inventory.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Frame>
+    </>
+  );
+}
+
+function ReportsPage({ data }) {
+  const { rentals, customers, inventory } = data;
+  const returned = rentals.filter(r => !!r.ActualReturn);
+
+  // Revenue: sum of deposits for returned rentals (approximation from deposits via rental join)
+  // We'll count rental days × use deposit as proxy since we don't have RentalRate in the data
+  const totalRentals = rentals.length;
+  const avgDuration = returned.length === 0 ? 0 : (
+    returned.reduce((sum, r) => {
+      const days = Math.max(1, Math.round((new Date(r.ActualReturn) - new Date(r.DateOut)) / 86400000));
+      return sum + days;
+    }, 0) / returned.length
+  ).toFixed(1);
+  const totalUnits   = inventory.filter(i => !i.Archived).length;
+  const rentedNow    = inventory.filter(i => i.Status === "Rented").length;
+  const utilization  = totalUnits === 0 ? 0 : Math.round((rentedNow / totalUnits) * 100);
+
+  // Top rented items
+  const itemCounts = {};
+  rentals.forEach(r => { itemCounts[r.Item] = (itemCounts[r.Item] || 0) + 1; });
+  const topItems = Object.entries(itemCounts).sort((a,b) => b[1]-a[1]).slice(0,5);
+
+  // Customer activity
+  const custCounts = {};
+  rentals.forEach(r => { custCounts[r.Customer] = (custCounts[r.Customer] || 0) + 1; });
+  const topCustomers = Object.entries(custCounts).sort((a,b) => b[1]-a[1]).slice(0,6);
+
+  function getInitials(name) {
+    return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  }
+
+  const panelStyle = { background:"var(--card)", border:"1px solid var(--line)", borderRadius:14, padding:"20px 22px", flex:1, minWidth:0 };
+
+  return (
+    <>
+      {/* KPI row */}
+      <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14, marginBottom:20}}>
+        <div className="stat-card">
+          <div className="lab" style={{fontSize:12,color:"var(--muted)",marginBottom:10}}>Total Rentals</div>
+          <div className="num" style={{fontSize:28}}>{totalRentals}</div>
+          <div className="lab">All time</div>
+        </div>
+        <div className="stat-card">
+          <div className="lab" style={{fontSize:12,color:"var(--muted)",marginBottom:10}}>Avg Rental Duration</div>
+          <div className="num" style={{fontSize:28}}>{avgDuration} <span style={{fontSize:16,fontWeight:400}}>days</span></div>
+          <div className="lab">Per rental</div>
+        </div>
+        <div className="stat-card">
+          <div className="lab" style={{fontSize:12,color:"var(--muted)",marginBottom:10}}>Equipment Utilization</div>
+          <div className="num" style={{fontSize:28}}>{utilization}<span style={{fontSize:16,fontWeight:400}}>%</span></div>
+          <div className="lab">Currently rented out</div>
+        </div>
+      </div>
+
+      {/* Two panels */}
+      <div style={{display:"flex", gap:14, flexWrap:"wrap"}}>
+        <div style={panelStyle}>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:15, marginBottom:18}}>Top Rented Equipment</div>
+          {topItems.length === 0 && <span style={{fontSize:13,color:"var(--muted)"}}>No data yet.</span>}
+          {topItems.map(([item, count], i) => (
+            <div key={item} style={{display:"flex", justifyContent:"space-between", alignItems:"center", paddingBottom:14, marginBottom:14, borderBottom:"1px solid var(--line)"}}>
+              <div style={{display:"flex", alignItems:"center", gap:12}}>
+                <span style={{fontFamily:"'IBM Plex Mono',monospace", fontSize:11, color:"var(--muted)", width:20}}>#{i+1}</span>
+                <span style={{fontSize:13}}>{item}</span>
+              </div>
+              <span style={{fontFamily:"'IBM Plex Mono',monospace", fontSize:12, color:"var(--amber)"}}>{count} rentals</span>
+            </div>
+          ))}
+        </div>
+
+        <div style={panelStyle}>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:15, marginBottom:18}}>Customer Activity</div>
+          {topCustomers.length === 0 && <span style={{fontSize:13,color:"var(--muted)"}}>No data yet.</span>}
+          {topCustomers.map(([name, count]) => {
+            const cust = customers.find(c => c.FullName === name);
+            return (
+              <div key={name} style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14}}>
+                <div style={{display:"flex", alignItems:"center", gap:10}}>
+                  <div style={{width:34,height:34,borderRadius:"50%",background:"var(--amber)",color:"#1A1320",fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    {getInitials(name)}
+                  </div>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600}}>{name}</div>
+                    <div style={{fontSize:11,color:"var(--muted)"}}>C-{String(cust?.CustomerID||'').padStart(3,'0')}</div>
+                  </div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:12,fontFamily:"'IBM Plex Mono',monospace",color:"var(--amber)",fontWeight:600}}>{count} rentals</div>
+                  <Chip tone={cust?.Verified ? "green" : "amber"} style={{marginTop:2}}>{cust?.Verified ? "Active" : "Pending"}</Chip>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function AuditLogsPage({ data }) {
+  const { rentals, inventory, customers } = data;
+  const [search, setSearch] = useState("");
+
+  // Build synthetic audit log from real data
+  const logs = [];
+  rentals.forEach(r => {
+    logs.push({ action:"Rental Created", detail:`${r.Item} rented to ${r.Customer}`, date: r.DateOut, type:"rental" });
+    if (r.ActualReturn) {
+      logs.push({ action:"Rental Returned", detail:`${r.Item} returned by ${r.Customer}`, date: r.ActualReturn, type:"rental" });
+    }
+  });
+  inventory.forEach(i => {
+    if (Number(i.Archived) === 1) {
+      logs.push({ action:"Equipment Archived", detail:`${i.ItemName} (${i.SerialNumber}) archived`, date: null, type:"inventory" });
+    }
+  });
+  customers.forEach(c => {
+    if (c.Verified) {
+      logs.push({ action:"Customer Verified", detail:`ID verified for ${c.FullName} (C-${String(c.CustomerID).padStart(3,'0')})`, date: null, type:"customer" });
+    }
+  });
+
+  logs.sort((a,b) => {
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return new Date(b.date) - new Date(a.date);
+  });
+
+  const typeMeta = {
+    rental:    { color:"#60A5FA", bg:"rgba(96,165,250,0.12)" },
+    inventory: { color:"var(--amber)", bg:"rgba(255,180,84,0.12)" },
+    customer:  { color:"#A78BFA", bg:"rgba(167,139,250,0.12)" },
+    payment:   { color:"var(--green)", bg:"rgba(74,222,128,0.12)" },
+    deposit:   { color:"var(--rose)", bg:"rgba(251,113,133,0.12)" },
+  };
+
+  const filtered = logs.filter(l =>
+    !search || l.action.toLowerCase().includes(search.toLowerCase()) || l.detail.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18, gap:12}}>
+        <div style={{position:"relative", flex:1, maxWidth:380}}>
+          <svg style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",width:15,height:15,color:"var(--muted)"}} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search audit logs…"
+            style={{...inputStyle, paddingLeft:36}}
+          />
+        </div>
+        <div className="pill" style={{background:"none", border:"1px solid var(--amber)", color:"var(--amber)", fontWeight:600, cursor:"default", display:"flex", alignItems:"center", gap:6}}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export Logs
+        </div>
+      </div>
+      <Frame>
+        <table>
+          <thead>
+            <tr>
+              <th style={{width:50}}>#</th>
+              <th>Action</th>
+              <th>Detail</th>
+              <th>Timestamp</th>
+              <th>Type</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr><td colSpan="5" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No logs found.</td></tr>
+            )}
+            {filtered.map((l, i) => {
+              const meta = typeMeta[l.type] || typeMeta.inventory;
+              return (
+                <tr key={i}>
+                  <td className="mono-cell">{String(i+1).padStart(4,"0")}</td>
+                  <td style={{fontWeight:600, fontSize:13}}>{l.action}</td>
+                  <td style={{fontSize:13, color:"var(--muted)"}}>{l.detail}</td>
+                  <td className="mono-cell" style={{whiteSpace:"nowrap"}}>
+                    {l.date ? new Date(l.date).toLocaleString("en-US",{month:"short",day:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"}
+                  </td>
+                  <td>
+                    <span style={{display:"inline-block", padding:"3px 10px", borderRadius:100, fontSize:11.5, fontWeight:600, background:meta.bg, color:meta.color, textTransform:"capitalize"}}>
+                      {l.type}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Frame>
+    </>
+  );
+}

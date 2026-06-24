@@ -29,4 +29,19 @@ $_SESSION['userID']     = $user['UserID'];
 $_SESSION['customerID'] = $user['CustomerID'];
 $_SESSION['role']       = $user['Role'];
 
-echo json_encode(["success" => true, "role" => $user['Role']]);
+$name = null;
+if ($user['CustomerID']) {
+    $s = $conn->prepare("SELECT FullName FROM Customers WHERE CustomerID = ?");
+    $s->bind_param("i", $user['CustomerID']);
+    $s->execute();
+    $row = $s->get_result()->fetch_assoc();
+    $s->close();
+    $name = $row['FullName'] ?? null;
+}
+
+echo json_encode([
+    "success"    => true,
+    "role"       => $user['Role'],
+    "name"       => $name,
+    "customerID" => $user['CustomerID'],
+]);

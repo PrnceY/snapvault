@@ -826,7 +826,50 @@ html, body {
 
       <div class="register-link" id="register-area">
         New customer?
-        <a href="#">Create an account</a>
+        <a href="#" onclick="openRegister(); return false;">Create an account</a>
+      </div>
+
+      <!-- Register Modal -->
+      <div id="reg-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,9,13,0.7);z-index:100;display:none;align-items:center;justify-content:center;">
+        <div style="background:#1E1C26;border:1px solid #2C2A36;border-radius:16px;padding:28px 28px 24px;width:360px;max-width:92vw;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;">Create an account</span>
+            <span style="cursor:pointer;color:#9C97A8;font-size:20px;line-height:1;" onclick="closeRegister()">×</span>
+          </div>
+          <div id="reg-error" style="display:none;background:rgba(251,113,133,0.1);border:1px solid rgba(251,113,133,0.3);color:#FB7185;font-size:12.5px;padding:9px 12px;border-radius:8px;margin-bottom:14px;"></div>
+          <div id="reg-success" style="display:none;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);color:#4ADE80;font-size:12.5px;padding:9px 12px;border-radius:8px;margin-bottom:14px;"></div>
+          <div style="margin-bottom:11px;">
+            <label style="display:block;font-size:11px;color:#9C97A8;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;">Full Name</label>
+            <input id="reg-name" type="text" placeholder="Juan dela Cruz" style="width:100%;background:#262430;border:1px solid #2C2A36;border-radius:8px;padding:9px 11px;color:#F3EFE6;font-size:13.5px;font-family:'Inter',sans-serif;outline:none;" />
+          </div>
+          <div style="margin-bottom:11px;">
+            <label style="display:block;font-size:11px;color:#9C97A8;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;">Email Address</label>
+            <input id="reg-email" type="email" placeholder="you@example.com" style="width:100%;background:#262430;border:1px solid #2C2A36;border-radius:8px;padding:9px 11px;color:#F3EFE6;font-size:13.5px;font-family:'Inter',sans-serif;outline:none;" />
+          </div>
+          <div style="margin-bottom:11px;">
+            <label style="display:block;font-size:11px;color:#9C97A8;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;">Contact Number</label>
+            <input id="reg-contact" type="text" placeholder="09XX XXX XXXX" style="width:100%;background:#262430;border:1px solid #2C2A36;border-radius:8px;padding:9px 11px;color:#F3EFE6;font-size:13.5px;font-family:'Inter',sans-serif;outline:none;" />
+          </div>
+          <div style="margin-bottom:11px;">
+            <label style="display:block;font-size:11px;color:#9C97A8;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;">ID Type</label>
+            <select id="reg-idtype" style="width:100%;background:#262430;border:1px solid #2C2A36;border-radius:8px;padding:9px 11px;color:#F3EFE6;font-size:13.5px;font-family:'Inter',sans-serif;outline:none;">
+              <option value="">Select an ID type</option>
+              <option>Passport</option>
+              <option>Driver's License</option>
+              <option>SSS ID</option>
+              <option>PhilHealth ID</option>
+              <option>Postal ID</option>
+              <option>Voter's ID</option>
+              <option>National ID</option>
+            </select>
+          </div>
+          <div style="margin-bottom:18px;">
+            <label style="display:block;font-size:11px;color:#9C97A8;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;">Password</label>
+            <input id="reg-pw" type="password" placeholder="Min. 8 characters" style="width:100%;background:#262430;border:1px solid #2C2A36;border-radius:8px;padding:9px 11px;color:#F3EFE6;font-size:13.5px;font-family:'Inter',sans-serif;outline:none;" />
+          </div>
+          <button onclick="submitRegister()" style="width:100%;padding:11px;border-radius:9px;border:none;cursor:pointer;background:#FFB454;color:#1A1320;font-weight:700;font-size:13.5px;font-family:'Inter',sans-serif;">Create Account</button>
+          <p style="text-align:center;font-size:12px;color:#9C97A8;margin-top:14px;margin-bottom:0;">Already have an account? <a href="#" onclick="closeRegister();return false;" style="color:#FFB454;text-decoration:none;">Sign in</a></p>
+        </div>
       </div>
 
       <div class="role-badge" id="role-badge">
@@ -938,6 +981,65 @@ html, body {
     .catch(() => {
       document.getElementById('stat-units').textContent = '17+';
     });
+
+function openRegister() {
+    const ov = document.getElementById('reg-overlay');
+    ov.style.display = 'flex';
+  }
+
+  function closeRegister() {
+    document.getElementById('reg-overlay').style.display = 'none';
+    ['reg-name','reg-email','reg-contact','reg-pw'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('reg-idtype').value = '';
+    document.getElementById('reg-error').style.display = 'none';
+    document.getElementById('reg-success').style.display = 'none';
+  }
+
+  async function submitRegister() {
+    const name    = document.getElementById('reg-name').value.trim();
+    const email   = document.getElementById('reg-email').value.trim();
+    const contact = document.getElementById('reg-contact').value.trim();
+    const idtype  = document.getElementById('reg-idtype').value;
+    const pw      = document.getElementById('reg-pw').value;
+    const errEl   = document.getElementById('reg-error');
+    const okEl    = document.getElementById('reg-success');
+
+    errEl.style.display = 'none';
+    okEl.style.display  = 'none';
+
+    if (!name || !email || !pw) {
+      errEl.textContent = 'Full name, email, and password are required.';
+      errEl.style.display = 'block';
+      return;
+    }
+    if (pw.length < 8) {
+      errEl.textContent = 'Password must be at least 8 characters.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    try {
+      const res  = await fetch('customers.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action:'add', FullName:name, Email:email, ContactNumber:contact, IDType:idtype, Password:pw }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        errEl.textContent = data.error || 'Registration failed.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      okEl.textContent = 'Account created! You can now sign in.';
+      okEl.style.display = 'block';
+      setTimeout(closeRegister, 2000);
+    } catch (e) {
+      errEl.textContent = 'Could not reach the server. Try again.';
+      errEl.style.display = 'block';
+    }
+  }
 </script>
 
 </body>

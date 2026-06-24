@@ -17,9 +17,9 @@ $stmt->bind_param("s", $email);
 $stmt->execute();
 $user = $stmt->get_result()->fetch_assoc();
 $stmt->close();
-$conn->close();
 
 if (!$user || !password_verify($password, $user['PasswordHash'])) {
+    $conn->close();
     http_response_code(401);
     echo json_encode(["success" => false, "error" => "Invalid email or password."]);
     exit;
@@ -39,6 +39,7 @@ if ($user['CustomerID']) {
     $name = $row['FullName'] ?? null;
 }
 
+$conn->close();
 echo json_encode([
     "success"    => true,
     "role"       => $user['Role'],

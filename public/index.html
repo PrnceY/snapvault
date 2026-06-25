@@ -900,7 +900,7 @@ html, body {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>`,
       text: 'Signing in as Admin — full access to inventory, rentals, deposits, and audit logs.',
       registerHtml: 'Need admin access? <a href="#">Contact system owner</a>',
-      redirect: 'index.html',
+      redirect: 'dashboard.html',
     },
   };
 
@@ -945,7 +945,7 @@ html, body {
       const res = await fetch('auth.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: pw, loginAs: 'customer' }),
+        body: JSON.stringify({ email, password: pw, loginAs: currentRole }),
       });
       const data = await res.json();
 
@@ -957,7 +957,7 @@ html, body {
         return;
       }
 
-      window.location.href = data.role === 'admin' ? 'dashboard.html' : 'customer.html';
+      window.location.href = roleMeta[currentRole].redirect;
     } catch (e) {
       errEl.textContent = 'Could not reach the server. Try again.';
       errEl.classList.add('visible');

@@ -12,37 +12,45 @@ if (!$email || !$password) {
     exit;
 }
 
-$stmt = $conn->prepare("SELECT UserID, CustomerID, PasswordHash, Role FROM Users WHERE Email = ?");
+// Try customer login first
+$stmt = $conn->prepare("SELECT CustomerID, FullName, PasswordHash FROM Customers WHERE Email = ?");
 $stmt->bind_param("s", $email);
 $stmt->execute();
-$user = $stmt->get_result()->fetch_assoc();
+$customer = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-if (!$user || !password_verify($password, $user['PasswordHash'])) {
+if ($customer && password_verify($password, $customer['PasswordHash'])) {
+    $_SESSION['customerID'] = $customer['CustomerID'];
+    $_SESSION['role']       = 'customer';
+    $conn->close();
+    echo json_encode([
+        "success"    => true,
+        "role"       => "customer",
+        "name"       => $customer['FullName'],
+        "customerID" => $customer['CustomerID'],
+    ]);
+    exit;
+}
+
+// Try admin login
+$stmt = $conn->prepare("SELECT AdminID, PasswordHash FROM Admins WHERE Email = ?");
+$stmt->bind_param("s", $email);
+$stmt->execute();
+$admin = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$admin || !password_verify($password, $admin['PasswordHash'])) {
     $conn->close();
     http_response_code(401);
     echo json_encode(["success" => false, "error" => "Invalid email or password."]);
     exit;
 }
 
-$_SESSION['userID']     = $user['UserID'];
-$_SESSION['customerID'] = $user['CustomerID'];
-$_SESSION['role']       = $user['Role'];
-
-$name = null;
-if ($user['CustomerID']) {
-    $s = $conn->prepare("SELECT FullName FROM Customers WHERE CustomerID = ?");
-    $s->bind_param("i", $user['CustomerID']);
-    $s->execute();
-    $row = $s->get_result()->fetch_assoc();
-    $s->close();
-    $name = $row['FullName'] ?? null;
-}
-
+$_SESSION['adminID'] = $admin['AdminID'];
+$_SESSION['role']    = 'admin';
 $conn->close();
 echo json_encode([
-    "success"    => true,
-    "role"       => $user['Role'],
-    "name"       => $name,
-    "customerID" => $user['CustomerID'],
+    "success" => true,
+    "role"    => "admin",
+    "name"    => null,
 ]);

@@ -32,7 +32,7 @@ if ($action === 'add') {
     $hash     = password_hash($data['Password'], PASSWORD_DEFAULT);
 
     // Check if email already in use
-    $chk = $conn->prepare("SELECT UserID FROM Users WHERE Email = ?");
+    $chk = $conn->prepare("SELECT CustomerID FROM Customers WHERE Email = ?");
     $chk->bind_param("s", $email);
     $chk->execute();
     $chk->store_result();
@@ -47,16 +47,11 @@ if ($action === 'add') {
 
     $conn->begin_transaction();
     try {
-        $s1 = $conn->prepare("INSERT INTO Customers (FullName, IDType, ContactNumber, Verified) VALUES (?, ?, ?, 0)");
-        $s1->bind_param("sss", $fullName, $idType, $contact);
+        $s1 = $conn->prepare("INSERT INTO Customers (FullName, IDType, ContactNumber, Verified, Email, PasswordHash) VALUES (?, ?, ?, 0, ?, ?)");
+        $s1->bind_param("sssss", $fullName, $idType, $contact, $email, $hash);
         $s1->execute();
         $customerId = $conn->insert_id;
         $s1->close();
-
-        $s2 = $conn->prepare("INSERT INTO Users (CustomerID, Email, PasswordHash, Role) VALUES (?, ?, ?, 'customer')");
-        $s2->bind_param("iss", $customerId, $email, $hash);
-        $s2->execute();
-        $s2->close();
 
         $conn->commit();
         echo json_encode(["success" => true]);

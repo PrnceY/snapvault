@@ -33,7 +33,7 @@ if ($customer && password_verify($password, $customer['PasswordHash'])) {
 }
 
 // Try admin login
-$stmt = $conn->prepare("SELECT AdminID, PasswordHash FROM Admins WHERE Email = ?");
+$stmt = $conn->prepare("SELECT UserID, PasswordHash FROM Admins WHERE Email = ?");
 $stmt->bind_param("s", $email);
 $stmt->execute();
 $admin = $stmt->get_result()->fetch_assoc();
@@ -46,7 +46,7 @@ if (!$admin || !password_verify($password, $admin['PasswordHash'])) {
     exit;
 }
 
-$_SESSION['adminID'] = $admin['AdminID'];
+$_SESSION['adminID'] = $admin['UserID'];
 $_SESSION['role']    = 'admin';
 $conn->close();
 echo json_encode([

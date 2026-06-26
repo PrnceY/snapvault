@@ -427,17 +427,20 @@ function CustomerCatalog({ data }) {
 /* ── 2. Compatibility Checker ── */
 function CustomerCompat({ data }) {
   const { inventory } = data;
-  const bodies  = inventory.filter(i => i.CategoryName === 'Camera Bodies');
-  const lenses  = inventory.filter(i => i.CategoryName === 'Lenses');
-  const [selBody,  setSelBody]  = useState('');
-  const [selLens,  setSelLens]  = useState('');
+  const bodies  = inventory.filter(i => i.CategoryName === 'Camera Bodies' && !Number(i.Archived));
+  const lenses  = inventory.filter(i => i.CategoryName === 'Lenses'        && !Number(i.Archived));
+  const [compat,  setCompat]  = useState([]);
+  const [selBody, setSelBody] = useState('');
+  const [selLens, setSelLens] = useState('');
 
-  function compatible(body, lens) { return getBrand(body.ItemName) === getBrand(lens.ItemName); }
+  useEffect(() => {
+    fetch('compatibility.php').then(r => r.json()).then(setCompat).catch(console.error);
+  }, []);
 
   const resultItems = selBody
-    ? lenses.filter(l => compatible(bodies.find(b=>b.SerialNumber===selBody), l))
+    ? lenses.filter(l => compat.some(c => c.CameraSerial === selBody && c.LensSerial === l.SerialNumber))
     : selLens
-    ? bodies.filter(b => compatible(b, lenses.find(l=>l.SerialNumber===selLens)))
+    ? bodies.filter(b => compat.some(c => c.LensSerial === selLens && c.CameraSerial === b.SerialNumber))
     : [];
 
   const availTone = s => s === 'Available' ? 'green' : s === 'Rented' ? 'amber' : 'rose';
@@ -464,6 +467,12 @@ function CustomerCompat({ data }) {
           </div>
         </div>
       </div>
+
+      {(selBody || selLens) && resultItems.length === 0 && (
+        <div style={{textAlign:'center',color:'var(--muted)',fontSize:13,padding:24}}>
+          No compatible items found in inventory.
+        </div>
+      )}
 
       {resultItems.length > 0 && (
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>

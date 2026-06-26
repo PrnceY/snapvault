@@ -4,11 +4,14 @@ include 'db_connect.php';
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    $sql = "SELECT r.RentalID, c.FullName AS Customer, i.ItemName AS Item,
-                   r.DateOut, r.ExpectedBack, r.ActualReturn
-            FROM Rentals r
-            JOIN Customers c ON r.CustomerID = c.CustomerID
-            JOIN Inventory i ON r.SerialNumber = i.SerialNumber";
+    $sql = "SELECT r.RentalID, c.FullName AS Customer,
+               GROUP_CONCAT(i.ItemName SEPARATOR ', ') AS Item,
+               r.DateOut, r.ExpectedBack, r.ActualReturn
+        FROM Rentals r
+        JOIN Customers c ON r.CustomerID = c.CustomerID
+        JOIN Rental_Items ri ON ri.RentalID = r.RentalID
+        JOIN Inventory i ON i.SerialNumber = ri.SerialNumber
+        GROUP BY r.RentalID, c.FullName, r.DateOut, r.ExpectedBack, r.ActualReturn";
     $result = $conn->query($sql);
     $rows = [];
     while ($row = $result->fetch_assoc()) {
@@ -37,19 +40,28 @@ if ($action === 'create') {
     $conn->begin_transaction();
 
     try {
-        $stmt = $conn->prepare("INSERT INTO Rentals (CustomerID, SerialNumber, DateOut, ExpectedBack) VALUES (?, ?, NOW(), ?)");
-        $stmt->bind_param("iss", $customerId, $serial, $expectedBack);
+        $serials = $data['SerialNumbers'] ?? (isset($data['SerialNumber']) ? [$data['SerialNumber']] : []);
+
+        $stmt = $conn->prepare("INSERT INTO Rentals (CustomerID, DateOut, ExpectedBack) VALUES (?, NOW(), ?)");
+        $stmt->bind_param("is", $customerId, $expectedBack);
         $stmt->execute();
         $rentalId = $conn->insert_id;
         $stmt->close();
 
+        foreach ($serials as $serial) {
+            $stmt = $conn->prepare("INSERT INTO Rental_Items (RentalID, SerialNumber) VALUES (?, ?)");
+            $stmt->bind_param("is", $rentalId, $serial);
+            $stmt->execute();
+            $stmt->close();
+
+            $stmt = $conn->prepare("UPDATE Inventory SET Status = 'Rented' WHERE SerialNumber = ?");
+            $stmt->bind_param("s", $serial);
+            $stmt->execute();
+            $stmt->close();
+        }
+
         $stmt = $conn->prepare("INSERT INTO Deposits (RentalID, AmountHeld, RefundStatus) VALUES (?, ?, 'Held')");
         $stmt->bind_param("id", $rentalId, $depositAmount);
-        $stmt->execute();
-        $stmt->close();
-
-        $stmt = $conn->prepare("UPDATE Inventory SET Status = 'Rented' WHERE SerialNumber = ?");
-        $stmt->bind_param("s", $serial);
         $stmt->execute();
         $stmt->close();
 
@@ -77,21 +89,22 @@ if ($action === 'return') {
     $conn->begin_transaction();
 
     try {
-        $stmt = $conn->prepare("SELECT SerialNumber FROM Rentals WHERE RentalID = ?");
+        $stmt = $conn->prepare("SELECT SerialNumber FROM Rental_Items WHERE RentalID = ?");
         $stmt->bind_param("i", $rentalId);
         $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
+        $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
 
-        if (!$row) {
+        if (empty($items)) {
             throw new Exception("Rental not found.");
         }
-        $serial = $row['SerialNumber'];
 
-        $stmt = $conn->prepare("UPDATE Rentals SET ActualReturn = NOW() WHERE RentalID = ?");
-        $stmt->bind_param("i", $rentalId);
-        $stmt->execute();
-        $stmt->close();
+        foreach ($items as $item) {
+            $s = $conn->prepare("UPDATE Inventory SET Status = 'Available' WHERE SerialNumber = ?");
+            $s->bind_param("s", $item['SerialNumber']);
+            $s->execute();
+            $s->close();
+        }
 
         $stmt = $conn->prepare("UPDATE Deposits SET RefundStatus = ? WHERE RentalID = ?");
         $stmt->bind_param("si", $refundStatus, $rentalId);

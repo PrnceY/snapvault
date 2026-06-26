@@ -711,46 +711,78 @@ function DepositsPage({ data }) {
 
 function CompatibilityPage({ data }) {
   const { inventory } = data;
-  const cameraBodies = inventory.filter(i => i.CategoryName === "Camera Bodies" && !i.Archived && i.Status !== "Archived");
-  const lenses       = inventory.filter(i => i.CategoryName === "Lenses"        && !i.Archived && i.Status !== "Archived");
+  const [compat, setCompat]     = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [selCamera, setSelCamera] = useState("");
+  const [selLens,   setSelLens]   = useState("");
+  const [notes,     setNotes]     = useState("");
+  const [saving,    setSaving]    = useState(false);
+  const [err,       setErr]       = useState(null);
 
-  // Simple brand-based compatibility: same brand = compatible
-  function getBrand(name) {
-    const lower = name.toLowerCase();
-    if (lower.startsWith("canon"))   return "Canon";
-    if (lower.startsWith("sony"))    return "Sony";
-    if (lower.startsWith("nikon"))   return "Nikon";
-    if (lower.startsWith("fuji"))    return "Fujifilm";
-    if (lower.startsWith("sigma"))   return "Sigma";
-    return "Other";
-  }
-  function isCompatible(body, lens) {
-    return getBrand(body.ItemName) === getBrand(lens.ItemName);
+  const cameraBodies = inventory.filter(i => i.CategoryName === "Camera Bodies" && !Number(i.Archived));
+  const lenses       = inventory.filter(i => i.CategoryName === "Lenses"        && !Number(i.Archived));
+
+  const fetchCompat = () =>
+    fetch("compatibility.php").then(r => r.json()).then(setCompat).catch(console.error);
+
+  useEffect(() => { fetchCompat(); }, []);
+
+  function isCompatible(cameraSerial, lensSerial) {
+    return compat.some(c => c.CameraSerial === cameraSerial && c.LensSerial === lensSerial);
   }
 
-  const checkIcon = (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.2">
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-      <polyline points="22 4 12 14.01 9 11.01"/>
-    </svg>
+  function getCompatEntry(cameraSerial, lensSerial) {
+    return compat.find(c => c.CameraSerial === cameraSerial && c.LensSerial === lensSerial);
+  }
+
+  async function addCompat() {
+    if (!selCamera || !selLens) { setErr("Select both a camera and a lens."); return; }
+    setSaving(true); setErr(null);
+    const res = await fetch("compatibility.php", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ action:"add", CameraSerial:selCamera, LensSerial:selLens, Notes:notes }),
+    }).then(r => r.json());
+    setSaving(false);
+    if (res.success) { fetchCompat(); setShowModal(false); setSelCamera(""); setSelLens(""); setNotes(""); }
+    else setErr(res.error || "Failed to add.");
+  }
+
+  async function removeCompat(id) {
+    await fetch("compatibility.php", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ action:"delete", CompatibilityID: id }),
+    });
+    fetchCompat();
+  }
+
+  const checkIcon = (id) => (
+    <div style={{display:"flex", flexDirection:"column", alignItems:"center", gap:4}}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.2">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      <span
+        onClick={() => removeCompat(id)}
+        title="Remove"
+        style={{fontSize:10, color:"var(--rose)", cursor:"pointer", fontFamily:"'IBM Plex Mono',monospace", opacity:0.7}}
+      >✕</span>
+    </div>
   );
 
-  const thStyle = { textAlign:"left", fontFamily:"'IBM Plex Mono',monospace", fontSize:10.5, letterSpacing:0.5, color:"var(--muted)", textTransform:"uppercase", fontWeight:500, padding:"12px 16px", borderBottom:"1px solid var(--line)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:120 };
+  const thStyle = { textAlign:"left", fontFamily:"'IBM Plex Mono',monospace", fontSize:10.5, letterSpacing:0.5, color:"var(--muted)", textTransform:"uppercase", fontWeight:500, padding:"12px 16px", borderBottom:"1px solid var(--line)", whiteSpace:"nowrap" };
   const tdStyle = { padding:"13px 16px", borderBottom:"1px solid var(--line)", textAlign:"center", verticalAlign:"middle" };
 
   return (
     <>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18}}>
-        <div>
-          <div style={{fontSize:12.5, color:"var(--muted)", marginTop:3}}>Manage camera-lens compatibility. Changes reflect in the customer portal.</div>
-        </div>
-        <div className="pill" style={{background:"var(--amber)", color:"#1A1320", borderColor:"var(--amber)", fontWeight:600, cursor:"default"}}>
+        <div style={{fontSize:12.5, color:"var(--muted)"}}>Manage camera-lens compatibility. Changes reflect in the customer portal.</div>
+        <button onClick={() => setShowModal(true)} style={{...buttonStyle, width:"auto", padding:"9px 18px", marginTop:0}}>
           + Add Compatibility
-        </div>
+        </button>
       </div>
+
       <Frame>
         <div style={{overflowX:"auto"}}>
-          <table style={{minWidth: 500}}>
+          <table style={{minWidth:500}}>
             <thead>
               <tr>
                 <th style={{...thStyle, textAlign:"left"}}>Camera Body</th>
@@ -762,23 +794,48 @@ function CompatibilityPage({ data }) {
               </tr>
             </thead>
             <tbody>
+              {cameraBodies.length === 0 && (
+                <tr><td colSpan={lenses.length+1} style={{color:"var(--muted)",textAlign:"center",padding:24}}>No camera bodies in inventory.</td></tr>
+              )}
               {cameraBodies.map(body => (
                 <tr key={body.SerialNumber}>
                   <td style={{...tdStyle, textAlign:"left", fontWeight:500, fontSize:13}}>{body.ItemName}</td>
-                  {lenses.map(lens => (
-                    <td key={lens.SerialNumber} style={tdStyle}>
-                      {isCompatible(body, lens) ? checkIcon : <span style={{color:"var(--line)"}}>·</span>}
-                    </td>
-                  ))}
+                  {lenses.map(lens => {
+                    const entry = getCompatEntry(body.SerialNumber, lens.SerialNumber);
+                    return (
+                      <td key={lens.SerialNumber} style={tdStyle}>
+                        {entry ? checkIcon(entry.CompatibilityID) : <span style={{color:"var(--line)"}}>·</span>}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
-              {cameraBodies.length === 0 && (
-                <tr><td colSpan={lenses.length + 1} style={{color:"var(--muted)", textAlign:"center", padding:24}}>No camera bodies in inventory.</td></tr>
-              )}
             </tbody>
           </table>
         </div>
       </Frame>
+
+      {showModal && (
+        <Modal title="Add Compatibility" onClose={() => { setShowModal(false); setErr(null); }}>
+          <FormField label="Camera Body">
+            <select value={selCamera} onChange={e => setSelCamera(e.target.value)} style={inputStyle}>
+              <option value="">— Select camera —</option>
+              {cameraBodies.map(c => <option key={c.SerialNumber} value={c.SerialNumber}>{c.ItemName}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Lens">
+            <select value={selLens} onChange={e => setSelLens(e.target.value)} style={inputStyle}>
+              <option value="">— Select lens —</option>
+              {lenses.map(l => <option key={l.SerialNumber} value={l.SerialNumber}>{l.ItemName}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Notes (optional)">
+            <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Requires EF adapter" style={inputStyle} />
+          </FormField>
+          {err && <div style={{color:"var(--rose)", fontSize:12.5, marginBottom:10}}>{err}</div>}
+          <button onClick={addCompat} disabled={saving} style={buttonStyle}>{saving ? "Saving…" : "Add Compatibility"}</button>
+        </Modal>
+      )}
     </>
   );
 }

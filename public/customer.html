@@ -61,7 +61,7 @@
 const { useState, useEffect } = React;
 
 function getInitials(name) {
-  if (!name) return '?';
+  if (!name) return '?'
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
@@ -76,17 +76,20 @@ function CustomerApp() {
 
   useEffect(() => {
     Promise.all([
-      fetch('customer_data.php').then(r => r.json()),
-      fetch('inventory.php').then(r => r.json()),
-      fetch('categories.php').then(r => r.json()),
-    ]).then(([d, inv, cats]) => {
-      setProfile(d.customer);
-      setRentals(d.rentals || []);
-      setAvailable(d.availableCount || 0);
-      setInventory(inv.filter(i => !i.Archived || Number(i.Archived) === 0));
-      setCustCategories(cats);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+        fetch('customer_data.php').then(r => r.json()),
+        fetch('inventory.php').then(r => r.json()),
+        fetch('categories.php').then(r => r.json()),
+      ]).then(([d, inv, cats]) => {
+        setProfile(d.customer);
+        setRentals(d.rentals || []);
+        setAvailable(d.availableCount || 0);
+        setInventory(Array.isArray(inv) ? inv.filter(i => Number(i.Archived) === 0) : []);
+        setCustCategories(Array.isArray(cats) ? cats : []);
+        setLoading(false);
+      }).catch(err => {
+        console.error('Customer data load failed:', err);
+        setLoading(false);
+      });
   }, []);
 
   const activeRentals   = rentals.filter(r => !r.ActualReturn);

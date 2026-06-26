@@ -305,7 +305,7 @@ function CustomerApp() {
 
           {!loading && page === 'catalog'   && <CustomerCatalog data={{inventory, categories: custCategories}} />}
           {!loading && page === 'compat'    && <CustomerCompat  data={{inventory}} />}
-          {!loading && page === 'rent'      && <CustomerRent    data={{inventory}} profile={profile} onSuccess={() => setPage('dashboard')} refetch={() => fetch('customer_data.php').then(r=>r.json()).then(d=>{setRentals(d.rentals||[]);setAvailable(d.availableCount||0);})} />}
+          {!loading && page === 'rent'      && <CustomerRent    data={{inventory, categories: custCategories}} profile={profile} onSuccess={() => setPage('dashboard')} refetch={() => fetch('customer_data.php').then(r=>r.json()).then(d=>{setRentals(d.rentals||[]);setAvailable(d.availableCount||0);})} />}
           {!loading && page === 'profile'   && <CustomerProfile profile={profile} rentals={rentals} />}
         </main>
       </div>

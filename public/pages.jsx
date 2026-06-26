@@ -241,8 +241,7 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
     return (filter === "All" || i.Status === filter) && matchesCategory;
   });
 
-  const submit = (e) => {
-    e.preventDefault();
+  const submit = () => {
     if (!form.SerialNumber || !form.CategoryID || !form.ItemName) {
       setFormError("Serial number, category, and item name are required.");
       return;
@@ -365,7 +364,7 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
 
       {showForm && (
         <Modal title="Add Inventory Item" onClose={() => setShowForm(false)}>
-          <form onSubmit={submit}>
+          <div>
             <FormField label="Photo">
               <div style={{display:"flex", alignItems:"center", gap:12}}>
                 <div className="thumb thumb-large">
@@ -405,8 +404,8 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
               </select>
             </FormField>
             {formError && <p style={{color:"var(--rose)", fontSize:12.5, marginTop:4}}>{formError}</p>}
-            <button type="submit" style={buttonStyle} disabled={saving}>{saving ? "Saving…" : "Add to Inventory"}</button>
-          </form>
+            <button type="button" style={buttonStyle} disabled={saving} onClick={submit}>{saving ? "Saving…" : "Add to Inventory"}</button>
+          </div>
         </Modal>
       )}
 

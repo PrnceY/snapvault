@@ -4,9 +4,9 @@ include 'db_connect.php';
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    $sql = "SELECT i.SerialNumber, i.ItemName, i.ImagePath, i.ConditionStatus, i.Status, i.Archived, c.CategoryName
-            FROM Inventory i
-            JOIN Equipment_Categories c ON i.CategoryID = c.CategoryID";
+    $sql = "SELECT i.SerialNumber, i.ItemName, i.RentalRate, i.ImagePath, i.ConditionStatus, i.Status, i.Archived, c.CategoryName
+        FROM Inventory i
+        JOIN Equipment_Categories c ON i.CategoryID = c.CategoryID";
     $result = $conn->query($sql);
     $rows = [];
     while ($row = $result->fetch_assoc()) {
@@ -30,7 +30,9 @@ if ($action === 'add') {
     $serial = $_POST['SerialNumber'] ?? null;
     $categoryId = isset($_POST['CategoryID']) ? (int)$_POST['CategoryID'] : null;
     $itemName = $_POST['ItemName'] ?? null;
+    $rentalRate = isset($_POST['RentalRate']) ? (float)$_POST['RentalRate'] : 0.00;
     $condition = $_POST['ConditionStatus'] ?? 'Good';
+    $status = $_POST['Status'] ?? 'Available';
     $status = $_POST['Status'] ?? 'Available';
 
     if (!$serial || !$categoryId || !$itemName) {
@@ -68,8 +70,8 @@ if ($action === 'add') {
         }
     }
 
-    $stmt = $conn->prepare("INSERT INTO Inventory (SerialNumber, CategoryID, ItemName, ImagePath, ConditionStatus, Status) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("sissss", $serial, $categoryId, $itemName, $imagePath, $condition, $status);
+    $stmt = $conn->prepare("INSERT INTO Inventory (SerialNumber, CategoryID, ItemName, RentalRate, ImagePath, ConditionStatus, Status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("sisdsss", $serial, $categoryId, $itemName, $rentalRate, $imagePath, $condition, $status);
 
     if ($stmt->execute()) {
         echo json_encode(["success" => true]);
@@ -90,7 +92,7 @@ if ($action === 'delete') {
     }
     $serial = $data['SerialNumber'];
 
-    $stmt = $conn->prepare("SELECT COUNT(*) AS cnt FROM Rentals WHERE SerialNumber = ? AND ActualReturn IS NULL");
+    $stmt = $conn->prepare("SELECT COUNT(*) AS cnt FROM Rental_Items ri JOIN Rentals r ON r.RentalID = ri.RentalID WHERE ri.SerialNumber = ? AND r.ActualReturn IS NULL");
     $stmt->bind_param("s", $serial);
     $stmt->execute();
     $activeCount = $stmt->get_result()->fetch_assoc()['cnt'];
@@ -133,6 +135,46 @@ if ($action === 'restore') {
         http_response_code(500);
         echo json_encode(["success" => false, "error" => $stmt->error]);
     }
+    $stmt->close();
+    $conn->close();
+    exit;
+}
+
+if ($action === 'edit') {
+    if (!$data || !isset($data['SerialNumber'])) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "error" => "Missing SerialNumber."]);
+        exit;
+    }
+    $serial     = $data['SerialNumber'];
+    $itemName   = $data['ItemName']       ?? null;
+    $rentalRate = isset($data['RentalRate']) ? (float)$data['RentalRate'] : null;
+    $condition  = $data['ConditionStatus'] ?? null;
+    $status     = $data['Status']          ?? null;
+    $categoryId = isset($data['CategoryID']) ? (int)$data['CategoryID'] : null;
+
+    $fields = [];
+    $types  = "";
+    $vals   = [];
+
+    if ($itemName   !== null) { $fields[] = "ItemName = ?";        $types .= "s"; $vals[] = $itemName; }
+    if ($rentalRate !== null) { $fields[] = "RentalRate = ?";      $types .= "d"; $vals[] = $rentalRate; }
+    if ($condition  !== null) { $fields[] = "ConditionStatus = ?"; $types .= "s"; $vals[] = $condition; }
+    if ($status     !== null) { $fields[] = "Status = ?";          $types .= "s"; $vals[] = $status; }
+    if ($categoryId !== null) { $fields[] = "CategoryID = ?";      $types .= "i"; $vals[] = $categoryId; }
+
+    if (empty($fields)) {
+        echo json_encode(["success" => true]);
+        $conn->close(); exit;
+    }
+
+    $types .= "s";
+    $vals[] = $serial;
+    $stmt = $conn->prepare("UPDATE Inventory SET " . implode(", ", $fields) . " WHERE SerialNumber = ?");
+    $stmt->bind_param($types, ...$vals);
+    $stmt->execute()
+        ? print(json_encode(["success" => true]))
+        : (http_response_code(500) && print(json_encode(["success" => false, "error" => $stmt->error])));
     $stmt->close();
     $conn->close();
     exit;

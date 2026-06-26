@@ -226,11 +226,13 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
   const { inventory, categories, refetch } = data;
   const [filter, setFilter] = useState("All");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ SerialNumber:"", CategoryID:"", ItemName:"", ConditionStatus:"Good", Status:"Available", Image:null });
+  const [form, setForm] = useState({ SerialNumber:"", CategoryID:"", ItemName:"", RentalRate:"", ConditionStatus:"Good", Status:"Available", Image:null });
   const [imagePreview, setImagePreview] = useState(null);
   const [deletingItem, setDeletingItem] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
   const statuses = ["All","Available","Rented","Maintenance","Archived"];
   const categoryOptions = ["All", ...categories.map(c => c.CategoryName)];
   const rows = inventory.filter(i => {
@@ -240,6 +242,9 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
     if (isArchived) return false;
     return (filter === "All" || i.Status === filter) && matchesCategory;
   });
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const submit = () => {
     if (!form.SerialNumber || !form.CategoryID || !form.ItemName) {
@@ -256,6 +261,7 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
     body.append("ItemName", form.ItemName);
     body.append("ConditionStatus", form.ConditionStatus);
     body.append("Status", form.Status);
+    body.append("RentalRate", form.RentalRate || 0);
     if (form.Image) body.append("Image", form.Image);
 
     fetch("inventory.php", { method: "POST", body })
@@ -264,7 +270,7 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
         setSaving(false);
         if (res.success) {
           setShowForm(false);
-          setForm({ SerialNumber:"", CategoryID:"", ItemName:"", ConditionStatus:"Good", Status:"Available", Image:null });
+          setForm({ SerialNumber:"", CategoryID:"", ItemName:"", RentalRate:"", ConditionStatus:"Good", Status:"Available", Image:null });
           setImagePreview(null);
           refetch();
         } else {
@@ -306,17 +312,39 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
       .catch(() => { setSaving(false); setFormError("Could not reach the server."); });
   };
 
+    const [editingItem, setEditingItem] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editError, setEditError] = useState(null);
+  const [editSaving, setEditSaving] = useState(false);
+
+  const submitEdit = () => {
+    setEditSaving(true);
+    setEditError(null);
+    fetch("inventory.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "edit", ...editForm }),
+    })
+      .then(r => r.json())
+      .then(res => {
+        setEditSaving(false);
+        if (res.success) { setEditingItem(null); refetch(); }
+        else setEditError(res.error || "Something went wrong.");
+      })
+      .catch(() => { setEditSaving(false); setEditError("Could not reach the server."); });
+  };
+
   return (
     <>
       <div className="pill-row" style={{justifyContent:"space-between", display:"flex", flexWrap:"wrap", gap:10}}>
         <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
           {statuses.map(s => (
-            <div key={s} className={`pill ${filter===s ? "on":""}`} onClick={() => setFilter(s)}>{s}</div>
+            <div key={s} className={`pill ${filter===s ? "on":""}`} onClick={() => { setFilter(s); setCurrentPage(1); }}>{s}</div>
           ))}
         </div>
         <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
           {categoryOptions.map(c => (
-            <div key={c} className={`pill ${categoryFilter===c ? "on":""}`} onClick={() => setCategoryFilter(c)}>{c}</div>
+            <div key={c} className={`pill ${categoryFilter===c ? "on":""}`} onClick={() => { setCategoryFilter(c); setCurrentPage(1); }}>{c}</div>
           ))}
         </div>
         <div className="pill" style={{background:"var(--amber)", color:"#1A1320", borderColor:"var(--amber)", fontWeight:600}} onClick={() => setShowForm(true)}>
@@ -327,7 +355,7 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
         <table>
           <thead><tr><th></th><th>Serial No.</th><th>Item</th><th>Category</th><th>Condition</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            {rows.map(i => (
+            {pageRows.map(i => (
               <tr key={i.SerialNumber}>
                 <td>
                   {i.ImagePath
@@ -340,27 +368,84 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
                 <td>{i.ConditionStatus}</td>
                 <td><Chip tone={statusTone(i.Status)}>{i.Status}</Chip></td>
                 <td>
-                  {Number(i.Archived) === 1 ? (
-                    <span
-                      style={{fontSize:11.5, color:"var(--amber)", cursor:"pointer", fontWeight:600}}
-                      onClick={() => restoreItem(i.SerialNumber)}
-                    >
-                      Restore
-                    </span>
-                  ) : i.Status !== "Rented" && (
-                    <span
-                      style={{fontSize:11.5, color:"var(--rose)", cursor:"pointer", fontWeight:600}}
-                      onClick={() => { setDeletingItem(i); setFormError(null); }}
-                    >
-                      Archive
-                    </span>
-                  )}
+                  <div style={{display:"flex", alignItems:"center", gap:10}}>
+                    {Number(i.Archived) === 1 ? (
+                      <span
+                        style={{fontSize:11.5, color:"var(--amber)", cursor:"pointer", fontWeight:600}}
+                        onClick={() => restoreItem(i.SerialNumber)}
+                      >
+                        Restore
+                      </span>
+                    ) : (
+                      <>
+                        <span
+                          title="Edit item"
+                          style={{cursor:"pointer", color:"var(--muted)", display:"flex", alignItems:"center"}}
+                          onClick={() => { setEditingItem(i); setEditForm({ SerialNumber:i.SerialNumber, ItemName:i.ItemName, RentalRate:i.RentalRate||"", CategoryID: categories.find(c=>c.CategoryName===i.CategoryName)?.CategoryID||"", ConditionStatus:i.ConditionStatus, Status:i.Status }); setEditError(null); }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </span>
+                        {i.Status !== "Rented" && (
+                          <span
+                            title="Archive item"
+                            style={{cursor:"pointer", color:"var(--rose)", display:"flex", alignItems:"center"}}
+                            onClick={() => { setDeletingItem(i); setFormError(null); }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </Frame>
+
+      {totalPages > 1 && (
+        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:14, padding:"0 4px"}}>
+          <span style={{fontSize:12, color:"var(--muted)", fontFamily:"'IBM Plex Mono',monospace"}}>
+            {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, rows.length)} of {rows.length} items
+          </span>
+          <div style={{display:"flex", gap:6}}>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+              style={{padding:"6px 13px", borderRadius:8, border:"1px solid var(--line)", background:"var(--card)", color: safePage === 1 ? "var(--muted)" : "var(--text)", cursor: safePage === 1 ? "default" : "pointer", fontSize:12, fontFamily:"'Inter',sans-serif"}}
+            >
+              ← Prev
+            </button>
+            {Array.from({length: totalPages}, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+              .reduce((acc, p, idx, arr) => {
+                if (idx > 0 && p - arr[idx - 1] > 1) acc.push("...");
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, idx) => p === "..." ? (
+                <span key={`ellipsis-${idx}`} style={{padding:"6px 4px", color:"var(--muted)", fontSize:12}}>…</span>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => setCurrentPage(p)}
+                  style={{padding:"6px 11px", borderRadius:8, border:"1px solid", borderColor: p === safePage ? "var(--amber)" : "var(--line)", background: p === safePage ? "var(--amber)" : "var(--card)", color: p === safePage ? "#1A1320" : "var(--text)", cursor:"pointer", fontSize:12, fontWeight: p === safePage ? 600 : 400, fontFamily:"'Inter',sans-serif"}}
+                >
+                  {p}
+                </button>
+              ))
+            }
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              style={{padding:"6px 13px", borderRadius:8, border:"1px solid var(--line)", background:"var(--card)", color: safePage === totalPages ? "var(--muted)" : "var(--text)", cursor: safePage === totalPages ? "default" : "pointer", fontSize:12, fontFamily:"'Inter',sans-serif"}}
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <Modal title="Add Inventory Item" onClose={() => setShowForm(false)}>
@@ -386,6 +471,9 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
             </FormField>
             <FormField label="Item Name">
               <input style={inputStyle} value={form.ItemName} onChange={e => setForm({...form, ItemName:e.target.value})} placeholder="e.g. Canon EOS R6" />
+            </FormField>
+            <FormField label="Rental Rate (₱/day)">
+              <input type="number" min="0" style={inputStyle} value={form.RentalRate || ""} onChange={e => setForm({...form, RentalRate:e.target.value})} placeholder="e.g. 1500" />
             </FormField>
             <FormField label="Category">
               <select style={inputStyle} value={form.CategoryID} onChange={e => setForm({...form, CategoryID:e.target.value})}>
@@ -422,6 +510,38 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
           >
             {saving ? "Archiving…" : "Archive Item"}
           </button>
+        </Modal>
+      )}
+
+      {editingItem && (
+        <Modal title={`Edit — ${editingItem.ItemName}`} onClose={() => setEditingItem(null)}>
+          <div>
+            <FormField label="Item Name">
+              <input style={inputStyle} value={editForm.ItemName} onChange={e => setEditForm({...editForm, ItemName:e.target.value})} />
+            </FormField>
+            <FormField label="Rental Rate (₱/day)">
+              <input type="number" min="0" style={inputStyle} value={editForm.RentalRate} onChange={e => setEditForm({...editForm, RentalRate:e.target.value})} placeholder="e.g. 1500" />
+            </FormField>
+            <FormField label="Category">
+              <select style={inputStyle} value={editForm.CategoryID} onChange={e => setEditForm({...editForm, CategoryID:e.target.value})}>
+                {categories.map(c => <option key={c.CategoryID} value={c.CategoryID}>{c.CategoryName}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Condition">
+              <select style={inputStyle} value={editForm.ConditionStatus} onChange={e => setEditForm({...editForm, ConditionStatus:e.target.value})}>
+                <option>Excellent</option><option>Good</option><option>Fair</option><option>Damaged</option>
+              </select>
+            </FormField>
+            <FormField label="Status">
+              <select style={inputStyle} value={editForm.Status} onChange={e => setEditForm({...editForm, Status:e.target.value})}>
+                <option>Available</option><option>Rented</option><option>Maintenance</option>
+              </select>
+            </FormField>
+            {editError && <p style={{color:"var(--rose)", fontSize:12.5, marginTop:4}}>{editError}</p>}
+            <button type="button" style={buttonStyle} disabled={editSaving} onClick={submitEdit}>
+              {editSaving ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
         </Modal>
       )}
     </>

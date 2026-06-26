@@ -313,24 +313,9 @@ function CustomerApp() {
   );
 }
 
-/* ── Rental rate helper (derived from serial prefix / name) ── */
+/* ── Rental rate — read directly from DB value ── */
 function getRentalRate(item) {
-  const n = item.ItemName.toLowerCase();
-  if (n.includes('canon eos 5d'))   return 2500;
-  if (n.includes('sony a7r'))       return 3500;
-  if (n.includes('nikon z9'))       return 4000;
-  if (n.includes('fujifilm x-t5'))  return 2000;
-  if (n.includes('70-200'))         return 1200;
-  if (n.includes('50mm f/1.4 usm')) return 600;
-  if (n.includes('sigma 35'))       return 800;
-  if (n.includes('24-70'))          return 1500;
-  if (n.includes('85mm f/1.4 gm')) return 1300;
-  if (n.includes('nikkor z 24-70')) return 1400;
-  if (n.includes('nikkor z 85'))    return 900;
-  if (n.includes('fujifilm xf 23')) return 700;
-  if (n.includes('tripod') || n.includes('manfrotto') || n.includes('gitzo')) return 500;
-  if (n.includes('profoto') || n.includes('godox') || n.includes('light')) return 1800;
-  return 800;
+  return Number(item.RentalRate) || 0;
 }
 
 function getBrand(name) {

@@ -125,7 +125,7 @@ function CustomerApp() {
     <div className="app">
       {/* ── Sidebar ── */}
       <aside className="sidebar">
-        <div className="brand" style={{padding:'20px 12px 0 12px', marginBottom:0, border:'none'}}>
+        <div className="brand" style={{padding:'0 12px 0 12px', marginBottom:0, border:'none'}}>
           <div className="brand-mark"><ApertureIcon /></div>
           <div className="brand-text">
             <span className="name">SnapVault</span>
@@ -170,7 +170,7 @@ function CustomerApp() {
         {/* Topbar */}
         <div className="topbar">
           <div className="topbar-left">
-            <div className="topbar-title">Dashboard</div>
+            <div className="topbar-title">{navItems.find(n => n.key === page)?.label || 'Dashboard'}</div>
             <div className="topbar-sub">{today} · Welcome {firstName}</div>
           </div>
           <div className="topbar-right">
@@ -308,7 +308,7 @@ function CustomerApp() {
           {!loading && page === 'catalog'   && <CustomerCatalog data={{inventory, categories: custCategories}} onRent={(item) => { setPreselectItem(item); setPage('rent'); }} />}
           {!loading && page === 'compat'    && <CustomerCompat  data={{inventory}} />}
           {!loading && page === 'rent'      && <CustomerRent    data={{inventory, categories: custCategories}} profile={profile} onSuccess={() => setPage('dashboard')} refetch={() => fetch('customer_data.php').then(r=>r.json()).then(d=>{setRentals(d.rentals||[]);setAvailable(d.availableCount||0);})} preselectItem={preselectItem} onConsumePreselect={() => setPreselectItem(null)} />}
-            {!loading && page === 'profile'   && <CustomerProfile profile={profile} rentals={rentals} />}
+            {!loading && page === 'profile'   && <CustomerProfile profile={profile} rentals={rentals} onProfileUpdated={() => fetch('customer_data.php').then(r=>r.json()).then(d=>{setProfile(d.customer);setRentals(d.rentals||[]);setAvailable(d.availableCount||0);})} />}
         </main>
       </div>
     </div>
@@ -345,7 +345,8 @@ function CustomerCatalog({ data, onRent }) {
   const [selectedItem, setSelectedItem] = useState(null);
   const PAGE_SIZE = 9; // 3-column grid, so 3 rows per page
 
-  const brands = [...new Set(inventory.map(i => getBrand(i.ItemName)))].sort();
+  const brands = [...new Set(inventory.map(i => getBrand(i.ItemName)))]
+    .sort((a, b) => a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b));
 
   const filtered = inventory.filter(i => {
     if (catFilter !== 'All'   && i.CategoryName !== catFilter) return false;
@@ -845,7 +846,7 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onCons
 }
 
 /* ── 4. My Profile ── */
-function CustomerProfile({ profile, rentals }) {
+function CustomerProfile({ profile, rentals, onProfileUpdated }) {
   if (!profile) return <div style={{color:'var(--muted)',fontSize:13}}>Loading profile…</div>;
 
   function getInitials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
@@ -854,39 +855,103 @@ function CustomerProfile({ profile, rentals }) {
   const depTone  = s => s === 'Full Refund' ? 'green' : s === 'Held' ? 'amber' : s === 'Forfeited' ? 'rose' : 'muted';
   const depLabel = s => s === 'Full Refund' ? 'Refunded' : s;
 
+  const [editing, setEditing] = useState(false);
+  const [form, setForm]       = useState({ FullName: profile.FullName || '', ContactNumber: profile.ContactNumber || '', IDType: profile.IDType || '' });
+  const [saving, setSaving]   = useState(false);
+  const [err, setErr]         = useState(null);
+
+  function startEdit() {
+    setForm({ FullName: profile.FullName || '', ContactNumber: profile.ContactNumber || '', IDType: profile.IDType || '' });
+    setErr(null);
+    setEditing(true);
+  }
+
+  function saveEdit() {
+    if (!form.FullName.trim()) { setErr('Full name is required.'); return; }
+    setSaving(true);
+    setErr(null);
+    fetch('customers.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'edit', ...form }),
+    })
+      .then(r => r.json())
+      .then(res => {
+        setSaving(false);
+        if (res.success) { setEditing(false); if (onProfileUpdated) onProfileUpdated(); }
+        else setErr(res.error || 'Could not update profile.');
+      })
+      .catch(() => { setSaving(false); setErr('Could not reach the server.'); });
+  }
+
+  const idOptions = ['Passport', "Driver's License", 'SSS ID', 'PhilHealth ID', 'Postal ID', "Voter's ID", 'National ID'];
+
   return (
     <div style={{maxWidth:640}}>
       {/* Profile card */}
       <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'26px 28px',marginBottom:16}}>
-        <div style={{display:'flex',alignItems:'center',gap:18,marginBottom:22}}>
-          <div style={{width:60,height:60,borderRadius:'50%',background:'var(--amber)',color:'#1A1320',fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-            {getInitials(profile.FullName)}
-          </div>
-          <div>
-            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:20}}>{profile.FullName}</div>
-            <div style={{fontSize:13,color:'var(--muted)',marginTop:2}}>Customer ID: C-{String(profile.CustomerID).padStart(3,'0')}</div>
-            {profile.Verified
-              ? <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12.5,color:'var(--green)',marginTop:4}}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                  Government ID Verified
-                </div>
-              : <div style={{fontSize:12.5,color:'var(--amber)',marginTop:4}}>⚠ ID Not Yet Verified</div>
-            }
-          </div>
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
-          {[
-            { icon:'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z M22 6l-10 7L2 6', label:'Contact', value: profile.ContactNumber || '—' },
-            { icon:'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 15.1 19.79 19.79 0 0 1 1.57 6.5 2 2 0 0 1 3.54 4.36h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 12a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 18.92z', label:'Phone', value: profile.ContactNumber || '—' },
-            { icon:'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z', label:'ID Type', value: profile.IDType || '—' },
-            { icon:'M3 7l9-4 9 4-9 4-9-4z M3 7v10l9 4 9-4V7 M12 11v10', label:'Total Rentals', value: `${rentals.length} completed` },
-          ].map((f,i) => (
-            <div key={i}>
-              <div style={{fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:5}}>{f.label}</div>
-              <div style={{fontSize:14,fontWeight:500}}>{f.value}</div>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:22}}>
+          <div style={{display:'flex',alignItems:'center',gap:18}}>
+            <div style={{width:60,height:60,borderRadius:'50%',background:'var(--amber)',color:'#1A1320',fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              {getInitials(profile.FullName)}
             </div>
-          ))}
+            <div>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:20}}>{profile.FullName}</div>
+              <div style={{fontSize:13,color:'var(--muted)',marginTop:2}}>Customer ID: C-{String(profile.CustomerID).padStart(3,'0')}</div>
+              {profile.Verified
+                ? <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12.5,color:'var(--green)',marginTop:4}}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    Government ID Verified
+                  </div>
+                : <div style={{fontSize:12.5,color:'var(--amber)',marginTop:4}}>⚠ ID Not Yet Verified</div>
+              }
+            </div>
+          </div>
+          {!editing && (
+            <button onClick={startEdit} style={{padding:'8px 14px',borderRadius:8,border:'1px solid var(--line)',background:'var(--card-hover)',color:'var(--text)',fontSize:12.5,fontWeight:600,cursor:'pointer',flexShrink:0}}>
+              Edit Profile
+            </button>
+          )}
         </div>
+
+        {!editing ? (
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+            {[
+              { label:'Contact', value: profile.ContactNumber || '—' },
+              { label:'ID Type', value: profile.IDType || '—' },
+              { label:'Total Rentals', value: `${rentals.length} completed` },
+            ].map((f,i) => (
+              <div key={i}>
+                <div style={{fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:5}}>{f.label}</div>
+                <div style={{fontSize:14,fontWeight:500}}>{f.value}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div>
+            <FormField label="Full Name">
+              <input value={form.FullName} onChange={e=>setForm({...form, FullName:e.target.value})} style={inputStyle} />
+            </FormField>
+            <FormField label="Contact Number">
+              <input value={form.ContactNumber} onChange={e=>setForm({...form, ContactNumber:e.target.value})} style={inputStyle} />
+            </FormField>
+            <FormField label="ID Type">
+              <select value={form.IDType} onChange={e=>setForm({...form, IDType:e.target.value})} style={inputStyle}>
+                <option value="">Select an ID type</option>
+                {idOptions.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </FormField>
+            {err && <div style={{color:'var(--rose)',fontSize:12.5,marginBottom:10}}>{err}</div>}
+            <div style={{display:'flex',gap:10,marginTop:6}}>
+              <button onClick={() => setEditing(false)} disabled={saving} style={{flex:1,padding:'10px',borderRadius:9,border:'1px solid var(--line)',background:'var(--card-hover)',color:'var(--text)',fontSize:13.5,fontWeight:600,cursor:'pointer'}}>
+                Cancel
+              </button>
+              <button onClick={saveEdit} disabled={saving} style={{...buttonStyle,flex:1,marginTop:0,opacity:saving?0.6:1}}>
+                {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Deposit history */}

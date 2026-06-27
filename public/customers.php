@@ -1,4 +1,5 @@
 <?php
+session_start();
 include 'db_connect.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -60,6 +61,36 @@ if ($action === 'add') {
         http_response_code(500);
         echo json_encode(["success" => false, "error" => $e->getMessage()]);
     }
+    $conn->close();
+    exit;
+}
+
+if ($action === 'edit') {
+    if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'customer') {
+        http_response_code(403);
+        echo json_encode(["success" => false, "error" => "Unauthorized"]);
+        $conn->close();
+        exit;
+    }
+
+    $customerId = (int)$_SESSION['customerID'];
+    $fullName   = trim($data['FullName'] ?? '');
+    $idType     = $data['IDType'] ?? '';
+    $contact    = trim($data['ContactNumber'] ?? '');
+
+    if (!$fullName) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "error" => "Full name is required."]);
+        $conn->close();
+        exit;
+    }
+
+    $stmt = $conn->prepare("UPDATE Customers SET FullName = ?, IDType = ?, ContactNumber = ? WHERE CustomerID = ?");
+    $stmt->bind_param("sssi", $fullName, $idType, $contact, $customerId);
+    $stmt->execute()
+        ? print(json_encode(["success" => true]))
+        : (http_response_code(500) && print(json_encode(["success" => false, "error" => $stmt->error])));
+    $stmt->close();
     $conn->close();
     exit;
 }

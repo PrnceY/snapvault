@@ -24,6 +24,7 @@
   .sidebar{
     width:228px;flex-shrink:0;background:#100F15;border-right:1px solid var(--line);
     display:flex;flex-direction:column;padding:24px 14px;
+    position:sticky;top:0;height:100vh;overflow-y:auto;
   }
   .brand{display:flex;align-items:center;gap:10px;padding:0 10px 22px 10px;border-bottom:1px solid var(--line);margin-bottom:18px;}
   .brand-mark{

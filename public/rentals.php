@@ -6,12 +6,12 @@ $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'GET') {
     $sql = "SELECT r.RentalID, c.FullName AS Customer,
                GROUP_CONCAT(i.ItemName SEPARATOR ', ') AS Item,
-               r.DateOut, r.ExpectedBack, r.ActualReturn
+               r.DateOut, r.ExpectedBack, r.ActualReturn, r.Archived
         FROM Rentals r
         JOIN Customers c ON r.CustomerID = c.CustomerID
         JOIN Rental_Items ri ON ri.RentalID = r.RentalID
         JOIN Inventory i ON i.SerialNumber = ri.SerialNumber
-        GROUP BY r.RentalID, c.FullName, r.DateOut, r.ExpectedBack, r.ActualReturn";
+        GROUP BY r.RentalID, c.FullName, r.DateOut, r.ExpectedBack, r.ActualReturn, r.Archived";
     $result = $conn->query($sql);
     $rows = [];
     while ($row = $result->fetch_assoc()) {
@@ -111,8 +111,8 @@ if ($action === 'return') {
         $stmt->execute();
         $stmt->close();
 
-        $stmt = $conn->prepare("UPDATE Inventory SET Status = 'Available' WHERE SerialNumber = ?");
-        $stmt->bind_param("s", $serial);
+        $stmt = $conn->prepare("UPDATE Rentals SET ActualReturn = NOW() WHERE RentalID = ?");
+        $stmt->bind_param("i", $rentalId);
         $stmt->execute();
         $stmt->close();
 
@@ -123,6 +123,44 @@ if ($action === 'return') {
         http_response_code(500);
         echo json_encode(["success" => false, "error" => $e->getMessage()]);
     }
+    $conn->close();
+    exit;
+}
+
+if ($action === 'archive') {
+    $rentalId = (int)($data['RentalID'] ?? 0);
+
+    $chk = $conn->prepare("SELECT ActualReturn FROM Rentals WHERE RentalID = ?");
+    $chk->bind_param("i", $rentalId);
+    $chk->execute();
+    $row = $chk->get_result()->fetch_assoc();
+    $chk->close();
+
+    if (!$row || $row['ActualReturn'] === null) {
+        http_response_code(409);
+        echo json_encode(["success" => false, "error" => "Only returned rentals can be archived."]);
+        $conn->close();
+        exit;
+    }
+
+    $stmt = $conn->prepare("UPDATE Rentals SET Archived = 1 WHERE RentalID = ?");
+    $stmt->bind_param("i", $rentalId);
+    $stmt->execute()
+        ? print(json_encode(["success" => true]))
+        : (http_response_code(500) && print(json_encode(["success" => false, "error" => $stmt->error])));
+    $stmt->close();
+    $conn->close();
+    exit;
+}
+
+if ($action === 'restore') {
+    $rentalId = (int)($data['RentalID'] ?? 0);
+    $stmt = $conn->prepare("UPDATE Rentals SET Archived = 0 WHERE RentalID = ?");
+    $stmt->bind_param("i", $rentalId);
+    $stmt->execute()
+        ? print(json_encode(["success" => true]))
+        : (http_response_code(500) && print(json_encode(["success" => false, "error" => $stmt->error])));
+    $stmt->close();
     $conn->close();
     exit;
 }

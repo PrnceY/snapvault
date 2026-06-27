@@ -722,10 +722,13 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
   const [refundChoice, setRefundChoice] = useState("Full Refund");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
-  const filters = ["All","On Loan","Returned"];
+  const filters = ["All","On Loan","Returned","Archived"];
 
   const availableItems = inventory.filter(i => i.Status === "Available");
   const rows = rentals.filter(r => {
+    const isArchived = Number(r.Archived) === 1;
+    if (rentalFilter === "Archived") return isArchived;
+    if (isArchived) return false;
     if (rentalFilter === "All") return true;
     return rentalFilter === "On Loan" ? !r.ActualReturn : !!r.ActualReturn;
   });
@@ -778,6 +781,28 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
       .catch(() => { setSaving(false); setFormError("Could not reach the server."); });
   };
 
+  const archiveRental = (rentalId) => {
+    fetch("rentals.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "archive", RentalID: rentalId }),
+    })
+      .then(r => r.json())
+      .then(res => { if (res.success) refetch(); })
+      .catch(() => {});
+  };
+
+  const restoreRental = (rentalId) => {
+    fetch("rentals.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "restore", RentalID: rentalId }),
+    })
+      .then(r => r.json())
+      .then(res => { if (res.success) refetch(); })
+      .catch(() => {});
+  };
+
   return (
     <>
       <div className="pill-row" style={{justifyContent:"space-between", display:"flex", flexWrap:"wrap", gap:10}}>
@@ -802,14 +827,28 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
                 <td className="mono-cell">{fmtDate(r.DateOut)}</td>
                 <td className="mono-cell">{fmtDate(r.ExpectedBack)}</td>
                 <td className="mono-cell">{r.ActualReturn ? fmtDate(r.ActualReturn) : "—"}</td>
-                <td><Chip tone={statusTone(r.ActualReturn ? "Done" : "Rented")}>{r.ActualReturn ? "Returned" : "On loan"}</Chip></td>
+                <td><Chip tone={Number(r.Archived) === 1 ? "muted" : statusTone(r.ActualReturn ? "Done" : "Rented")}>{Number(r.Archived) === 1 ? "Archived" : r.ActualReturn ? "Returned" : "On loan"}</Chip></td>
                 <td>
-                  {!r.ActualReturn && (
+                  {Number(r.Archived) === 1 ? (
+                    <span
+                      style={{fontSize:11.5, color:"var(--amber)", cursor:"pointer", fontWeight:600}}
+                      onClick={() => restoreRental(r.RentalID)}
+                    >
+                      Restore
+                    </span>
+                  ) : !r.ActualReturn ? (
                     <span
                       style={{fontSize:11.5, color:"var(--amber)", cursor:"pointer", fontWeight:600}}
                       onClick={() => { setReturningId(r.RentalID); setFormError(null); }}
                     >
                       Mark Returned
+                    </span>
+                  ) : (
+                    <span
+                      style={{fontSize:11.5, color:"var(--muted)", cursor:"pointer", fontWeight:600}}
+                      onClick={() => archiveRental(r.RentalID)}
+                    >
+                      Archive
                     </span>
                   )}
                 </td>

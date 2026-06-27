@@ -775,6 +775,7 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
   const [formError, setFormError] = useState(null);
   const [confirmArchiveRental, setConfirmArchiveRental] = useState(null);
   const [confirmRestoreRental, setConfirmRestoreRental] = useState(null);
+  const [confirmReturn, setConfirmReturn] = useState(false);
   const filters = ["All","On Loan","Returned","Archived"];
 
   const availableItems = inventory.filter(i => i.Status === "Available");

@@ -11,7 +11,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'customer') {
 $customerID = (int)$_SESSION['customerID'];
 
 // Customer profile
-$stmt = $conn->prepare("SELECT CustomerID, FullName, IDType, ContactNumber, Verified FROM Customers WHERE CustomerID = ?");
+$stmt = $conn->prepare("SELECT CustomerID, FullName, IDType, ContactNumber, Verified, IDImagePath, VerificationStatus FROM Customers WHERE CustomerID = ?");
 $stmt->bind_param("i", $customerID);
 $stmt->execute();
 $customer = $stmt->get_result()->fetch_assoc();

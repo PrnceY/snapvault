@@ -5,7 +5,7 @@ include 'db_connect.php';
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    $sql = "SELECT CustomerID, FullName, IDType, ContactNumber, Verified FROM Customers";
+    $sql = "SELECT CustomerID, FullName, IDType, ContactNumber, Verified, IDImagePath, VerificationStatus FROM Customers";
     $result = $conn->query($sql);
     $rows = [];
     while ($row = $result->fetch_assoc()) {
@@ -16,8 +16,12 @@ if ($method === 'GET') {
     exit;
 }
 
-$data = json_decode(file_get_contents("php://input"), true);
-$action = $data['action'] ?? null;
+$data = null;
+$action = $_POST['action'] ?? null;
+if (!$action) {
+    $data = json_decode(file_get_contents("php://input"), true);
+    $action = $data['action'] ?? null;
+}
 
 if ($action === 'add') {
     if (!$data || !isset($data['FullName'], $data['Email'], $data['Password'])) {
@@ -87,6 +91,96 @@ if ($action === 'edit') {
 
     $stmt = $conn->prepare("UPDATE Customers SET FullName = ?, IDType = ?, ContactNumber = ? WHERE CustomerID = ?");
     $stmt->bind_param("sssi", $fullName, $idType, $contact, $customerId);
+    $stmt->execute()
+        ? print(json_encode(["success" => true]))
+        : (http_response_code(500) && print(json_encode(["success" => false, "error" => $stmt->error])));
+    $stmt->close();
+    $conn->close();
+    exit;
+}
+
+if ($action === 'upload_id') {
+    if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'customer') {
+        http_response_code(403);
+        echo json_encode(["success" => false, "error" => "Unauthorized"]);
+        $conn->close();
+        exit;
+    }
+
+    $customerId = (int)$_SESSION['customerID'];
+
+    if (!isset($_FILES['IDImage']) || $_FILES['IDImage']['error'] !== UPLOAD_ERR_OK) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "error" => "No ID image was uploaded."]);
+        $conn->close();
+        exit;
+    }
+
+    $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+    $ext = strtolower(pathinfo($_FILES['IDImage']['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, $allowed)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "error" => "Only JPG, PNG, or WEBP images are allowed."]);
+        $conn->close();
+        exit;
+    }
+
+    $uploadDir = __DIR__ . '/uploads/ids/';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+
+    $filename = 'cust' . $customerId . '_' . time() . '.' . $ext;
+    $destination = $uploadDir . $filename;
+
+    if (!move_uploaded_file($_FILES['IDImage']['tmp_name'], $destination)) {
+        http_response_code(500);
+        echo json_encode(["success" => false, "error" => "Failed to save uploaded image."]);
+        $conn->close();
+        exit;
+    }
+
+    $imagePath = 'uploads/ids/' . $filename;
+    $stmt = $conn->prepare("UPDATE Customers SET IDImagePath = ?, VerificationStatus = 'Pending' WHERE CustomerID = ?");
+    $stmt->bind_param("si", $imagePath, $customerId);
+    $stmt->execute()
+        ? print(json_encode(["success" => true, "IDImagePath" => $imagePath]))
+        : (http_response_code(500) && print(json_encode(["success" => false, "error" => $stmt->error])));
+    $stmt->close();
+    $conn->close();
+    exit;
+}
+
+if ($action === 'verify') {
+    if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+        http_response_code(403);
+        echo json_encode(["success" => false, "error" => "Unauthorized"]);
+        $conn->close();
+        exit;
+    }
+
+    $customerId = (int)($data['CustomerID'] ?? 0);
+    $stmt = $conn->prepare("UPDATE Customers SET VerificationStatus = 'Verified', Verified = 1 WHERE CustomerID = ?");
+    $stmt->bind_param("i", $customerId);
+    $stmt->execute()
+        ? print(json_encode(["success" => true]))
+        : (http_response_code(500) && print(json_encode(["success" => false, "error" => $stmt->error])));
+    $stmt->close();
+    $conn->close();
+    exit;
+}
+
+if ($action === 'reject') {
+    if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+        http_response_code(403);
+        echo json_encode(["success" => false, "error" => "Unauthorized"]);
+        $conn->close();
+        exit;
+    }
+
+    $customerId = (int)($data['CustomerID'] ?? 0);
+    $stmt = $conn->prepare("UPDATE Customers SET VerificationStatus = 'Unverified', Verified = 0, IDImagePath = NULL WHERE CustomerID = ?");
+    $stmt->bind_param("i", $customerId);
     $stmt->execute()
         ? print(json_encode(["success" => true]))
         : (http_response_code(500) && print(json_encode(["success" => false, "error" => $stmt->error])));

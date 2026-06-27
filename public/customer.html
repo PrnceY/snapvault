@@ -860,6 +860,28 @@ function CustomerProfile({ profile, rentals, onProfileUpdated }) {
   const [saving, setSaving]   = useState(false);
   const [err, setErr]         = useState(null);
 
+  const [showIdUpload, setShowIdUpload] = useState(false);
+  const [idFile, setIdFile]             = useState(null);
+  const [uploading, setUploading]       = useState(false);
+  const [uploadErr, setUploadErr]       = useState(null);
+
+  function uploadId() {
+    if (!idFile) { setUploadErr('Please choose an image first.'); return; }
+    setUploading(true);
+    setUploadErr(null);
+    const fd = new FormData();
+    fd.append('action', 'upload_id');
+    fd.append('IDImage', idFile);
+    fetch('customers.php', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(res => {
+        setUploading(false);
+        if (res.success) { setShowIdUpload(false); setIdFile(null); if (onProfileUpdated) onProfileUpdated(); }
+        else setUploadErr(res.error || 'Upload failed.');
+      })
+      .catch(() => { setUploading(false); setUploadErr('Could not reach the server.'); });
+  }
+
   function startEdit() {
     setForm({ FullName: profile.FullName || '', ContactNumber: profile.ContactNumber || '', IDType: profile.IDType || '' });
     setErr(null);
@@ -898,12 +920,23 @@ function CustomerProfile({ profile, rentals, onProfileUpdated }) {
             <div>
               <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:20}}>{profile.FullName}</div>
               <div style={{fontSize:13,color:'var(--muted)',marginTop:2}}>Customer ID: C-{String(profile.CustomerID).padStart(3,'0')}</div>
-              {profile.Verified
+              {profile.VerificationStatus === 'Verified'
                 ? <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12.5,color:'var(--green)',marginTop:4}}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                     Government ID Verified
                   </div>
-                : <div style={{fontSize:12.5,color:'var(--amber)',marginTop:4}}>⚠ ID Not Yet Verified</div>
+                : profile.VerificationStatus === 'Pending'
+                ? <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12.5,color:'var(--amber)',marginTop:4}}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    ID Verification Pending — under review
+                  </div>
+                : <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
+                    <span style={{fontSize:12.5,color:'var(--amber)'}}>⚠ ID Not Yet Verified</span>
+                    <button onClick={() => setShowIdUpload(true)} style={{display:'flex',alignItems:'center',gap:5,padding:'3px 10px',borderRadius:100,border:'1px solid var(--amber)',background:'none',color:'var(--amber)',fontSize:11.5,fontWeight:600,cursor:'pointer'}}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                      Upload ID
+                    </button>
+                  </div>
               }
             </div>
           </div>
@@ -953,6 +986,21 @@ function CustomerProfile({ profile, rentals, onProfileUpdated }) {
           </div>
         )}
       </div>
+
+      {showIdUpload && (
+        <Modal title="Upload Government ID" onClose={() => { setShowIdUpload(false); setIdFile(null); setUploadErr(null); }}>
+          <p style={{fontSize:12.5,color:'var(--muted)',marginBottom:14}}>
+            Upload a clear photo of your {profile.IDType || 'government-issued ID'}. An admin will review it shortly.
+          </p>
+          <FormField label="ID Image">
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setIdFile(e.target.files[0] || null)} style={inputStyle} />
+          </FormField>
+          {uploadErr && <p style={{color:'var(--rose)',fontSize:12.5,marginBottom:8}}>{uploadErr}</p>}
+          <button onClick={uploadId} disabled={uploading} style={{...buttonStyle, opacity: uploading ? 0.6 : 1}}>
+            {uploading ? 'Uploading…' : 'Submit for Review'}
+          </button>
+        </Modal>
+      )}
 
       {/* Deposit history */}
       {deposits.length > 0 && (

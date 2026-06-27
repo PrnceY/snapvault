@@ -555,11 +555,48 @@ function CustomersPage({ data }) {
   const [form, setForm] = useState({ FullName:"", IDType:"School ID", ContactNumber:"", Verified:false });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
-  const filters = ["All","Verified","Pending"];
+  const [reviewing, setReviewing] = useState(null);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewError, setReviewError] = useState(null);
+  const filters = ["All","Verified","Pending","Unverified"];
   const rows = customers.filter(c => {
     if (filter === "All") return true;
-    return filter === "Verified" ? Number(c.Verified) === 1 : Number(c.Verified) === 0;
+    return (c.VerificationStatus || "Unverified") === filter;
   });
+
+  function approveId() {
+    setReviewSaving(true);
+    setReviewError(null);
+    fetch("customers.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "verify", CustomerID: reviewing.CustomerID }),
+    })
+      .then(r => r.json())
+      .then(res => {
+        setReviewSaving(false);
+        if (res.success) { setReviewing(null); refetch(); }
+        else setReviewError(res.error || "Could not verify customer.");
+      })
+      .catch(() => { setReviewSaving(false); setReviewError("Could not reach the server."); });
+  }
+
+  function rejectId() {
+    setReviewSaving(true);
+    setReviewError(null);
+    fetch("customers.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reject", CustomerID: reviewing.CustomerID }),
+    })
+      .then(r => r.json())
+      .then(res => {
+        setReviewSaving(false);
+        if (res.success) { setReviewing(null); refetch(); }
+        else setReviewError(res.error || "Could not reject ID.");
+      })
+      .catch(() => { setReviewSaving(false); setReviewError("Could not reach the server."); });
+  }
 
   const submit = (e) => {
     e.preventDefault();
@@ -610,7 +647,15 @@ function CustomersPage({ data }) {
                 <td className="empty-name">{c.FullName}</td>
                 <td>{c.IDType}</td>
                 <td className="mono-cell">{c.ContactNumber}</td>
-                <td><Chip tone={Number(c.Verified) ? "green":"rose"}>{Number(c.Verified) ? "Verified" : "Pending"}</Chip></td>
+                <td>
+                  {c.VerificationStatus === "Pending" ? (
+                    <span onClick={() => setReviewing(c)} style={{cursor:"pointer"}}>
+                      <Chip tone="amber">Pending Review</Chip>
+                    </span>
+                  ) : (
+                    <Chip tone={c.VerificationStatus === "Verified" ? "green" : "rose"}>{c.VerificationStatus || "Unverified"}</Chip>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -640,6 +685,29 @@ function CustomersPage({ data }) {
             {formError && <p style={{color:"var(--rose)", fontSize:12.5, marginTop:4}}>{formError}</p>}
             <button type="submit" style={buttonStyle} disabled={saving}>{saving ? "Saving…" : "Add Customer"}</button>
           </form>
+        </Modal>
+      )}
+
+      {reviewing && (
+        <Modal title={`Review ID — ${reviewing.FullName}`} onClose={() => { setReviewing(null); setReviewError(null); }}>
+          <div style={{fontSize:12.5,color:"var(--muted)",marginBottom:10}}>
+            CUS-{String(reviewing.CustomerID).padStart(3,"0")} · {reviewing.IDType}
+          </div>
+          <div style={{borderRadius:10,overflow:"hidden",border:"1px solid var(--line)",marginBottom:16,background:"var(--card-hover)"}}>
+            {reviewing.IDImagePath
+              ? <img src={reviewing.IDImagePath} alt="Submitted ID" style={{width:"100%",display:"block"}} />
+              : <div style={{padding:30,textAlign:"center",color:"var(--muted)",fontSize:12.5}}>No ID image on file.</div>
+            }
+          </div>
+          {reviewError && <p style={{color:"var(--rose)",fontSize:12.5,marginBottom:10}}>{reviewError}</p>}
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={rejectId} disabled={reviewSaving} style={{flex:1,padding:"10px",borderRadius:9,border:"1px solid var(--rose)",background:"none",color:"var(--rose)",fontSize:13.5,fontWeight:600,cursor:"pointer"}}>
+              Reject
+            </button>
+            <button onClick={approveId} disabled={reviewSaving} style={{...buttonStyle,flex:1,marginTop:0}}>
+              {reviewSaving ? "Saving…" : "Approve & Verify"}
+            </button>
+          </div>
         </Modal>
       )}
     </>

@@ -312,10 +312,12 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
       .catch(() => { setSaving(false); setFormError("Could not reach the server."); });
   };
 
-    const [editingItem, setEditingItem] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editError, setEditError] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
+  const [confirmAdd, setConfirmAdd] = useState(false);
+  const [confirmEdit, setConfirmEdit] = useState(false);
 
   const submitEdit = () => {
     setEditSaving(true);
@@ -492,7 +494,14 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
               </select>
             </FormField>
             {formError && <p style={{color:"var(--rose)", fontSize:12.5, marginTop:4}}>{formError}</p>}
-            <button type="button" style={buttonStyle} disabled={saving} onClick={submit}>{saving ? "Saving…" : "Add to Inventory"}</button>
+            <button type="button" style={buttonStyle} disabled={saving} onClick={() => {
+              if (!form.SerialNumber || !form.CategoryID || !form.ItemName) {
+                setFormError("Serial number, category, and item name are required.");
+                return;
+              }
+              setFormError(null);
+              setConfirmAdd(true);
+            }}>{saving ? "Saving…" : "Add to Inventory"}</button>
           </div>
         </Modal>
       )}
@@ -538,11 +547,31 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
               </select>
             </FormField>
             {editError && <p style={{color:"var(--rose)", fontSize:12.5, marginTop:4}}>{editError}</p>}
-            <button type="button" style={buttonStyle} disabled={editSaving} onClick={submitEdit}>
+            <button type="button" style={buttonStyle} disabled={editSaving} onClick={() => setConfirmEdit(true)}>
               {editSaving ? "Saving…" : "Save Changes"}
             </button>
           </div>
         </Modal>
+      )}
+      {confirmAdd && (
+        <ConfirmDialog
+          title="Add to Inventory"
+          message={`Add "${form.ItemName}" (${form.SerialNumber}) to inventory?`}
+          confirmLabel="Add Item"
+          confirmTone="amber"
+          onConfirm={() => { setConfirmAdd(false); submit(); }}
+          onCancel={() => setConfirmAdd(false)}
+        />
+      )}
+      {confirmEdit && (
+        <ConfirmDialog
+          title="Save Changes"
+          message={`Save changes to "${editForm.ItemName}"?`}
+          confirmLabel="Save Changes"
+          confirmTone="amber"
+          onConfirm={() => { setConfirmEdit(false); submitEdit(); }}
+          onCancel={() => setConfirmEdit(false)}
+        />
       )}
     </>
   );
@@ -558,6 +587,8 @@ function CustomersPage({ data }) {
   const [reviewing, setReviewing] = useState(null);
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewError, setReviewError] = useState(null);
+  const [confirmApprove, setConfirmApprove] = useState(false);
+  const [confirmReject, setConfirmReject] = useState(false);
   const filters = ["All","Verified","Pending","Unverified"];
   const rows = customers.filter(c => {
     if (filter === "All") return true;
@@ -701,14 +732,34 @@ function CustomersPage({ data }) {
           </div>
           {reviewError && <p style={{color:"var(--rose)",fontSize:12.5,marginBottom:10}}>{reviewError}</p>}
           <div style={{display:"flex",gap:10}}>
-            <button onClick={rejectId} disabled={reviewSaving} style={{flex:1,padding:"10px",borderRadius:9,border:"1px solid var(--rose)",background:"none",color:"var(--rose)",fontSize:13.5,fontWeight:600,cursor:"pointer"}}>
+            <button onClick={() => setConfirmReject(true)} disabled={reviewSaving} style={{flex:1,padding:"10px",borderRadius:9,border:"1px solid var(--rose)",background:"none",color:"var(--rose)",fontSize:13.5,fontWeight:600,cursor:"pointer"}}>
               Reject
             </button>
-            <button onClick={approveId} disabled={reviewSaving} style={{...buttonStyle,flex:1,marginTop:0}}>
+            <button onClick={() => setConfirmApprove(true)} disabled={reviewSaving} style={{...buttonStyle,flex:1,marginTop:0}}>
               {reviewSaving ? "Saving…" : "Approve & Verify"}
             </button>
           </div>
         </Modal>
+      )}
+      {confirmApprove && (
+        <ConfirmDialog
+          title="Approve & Verify"
+          message={`Verify the government ID for ${reviewing?.FullName}? This will mark them as a verified customer.`}
+          confirmLabel="Approve & Verify"
+          confirmTone="green"
+          onConfirm={() => { setConfirmApprove(false); approveId(); }}
+          onCancel={() => setConfirmApprove(false)}
+        />
+      )}
+      {confirmReject && (
+        <ConfirmDialog
+          title="Reject ID"
+          message={`Reject the submitted ID for ${reviewing?.FullName}? Their verification status will be reset and the image removed.`}
+          confirmLabel="Reject"
+          confirmTone="rose"
+          onConfirm={() => { setConfirmReject(false); rejectId(); }}
+          onCancel={() => setConfirmReject(false)}
+        />
       )}
     </>
   );
@@ -722,6 +773,8 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
   const [refundChoice, setRefundChoice] = useState("Full Refund");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [confirmArchiveRental, setConfirmArchiveRental] = useState(null);
+  const [confirmRestoreRental, setConfirmRestoreRental] = useState(null);
   const filters = ["All","On Loan","Returned","Archived"];
 
   const availableItems = inventory.filter(i => i.Status === "Available");
@@ -832,7 +885,7 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
                   {Number(r.Archived) === 1 ? (
                     <span
                       style={{fontSize:11.5, color:"var(--amber)", cursor:"pointer", fontWeight:600}}
-                      onClick={() => restoreRental(r.RentalID)}
+                      onClick={() => setConfirmRestoreRental(r.RentalID)}
                     >
                       Restore
                     </span>
@@ -846,7 +899,7 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
                   ) : (
                     <span
                       style={{fontSize:11.5, color:"var(--muted)", cursor:"pointer", fontWeight:600}}
-                      onClick={() => archiveRental(r.RentalID)}
+                      onClick={() => setConfirmArchiveRental(r.RentalID)}
                     >
                       Archive
                     </span>
@@ -895,9 +948,39 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
               </select>
             </FormField>
             {formError && <p style={{color:"var(--rose)", fontSize:12.5, marginTop:4}}>{formError}</p>}
-            <button type="submit" style={buttonStyle} disabled={saving}>{saving ? "Saving…" : "Confirm Return"}</button>
+            <button type="button" style={buttonStyle} disabled={saving} onClick={() => setConfirmReturn(true)}>{saving ? "Saving…" : "Confirm Return"}</button>
           </form>
         </Modal>
+      )}
+      {confirmReturn && (
+        <ConfirmDialog
+          title="Mark as Returned"
+          message={`Mark rental RNT-${returningId} as returned with refund status: "${refundChoice}"?`}
+          confirmLabel="Confirm Return"
+          confirmTone="green"
+          onConfirm={() => { setConfirmReturn(false); submitReturn({ preventDefault:()=>{} }); }}
+          onCancel={() => setConfirmReturn(false)}
+        />
+      )}
+      {confirmArchiveRental && (
+        <ConfirmDialog
+          title="Archive Rental"
+          message={`Archive rental RNT-${confirmArchiveRental}? It will be hidden from the default view but can be restored.`}
+          confirmLabel="Archive"
+          confirmTone="rose"
+          onConfirm={() => { archiveRental(confirmArchiveRental); setConfirmArchiveRental(null); }}
+          onCancel={() => setConfirmArchiveRental(null)}
+        />
+      )}
+      {confirmRestoreRental && (
+        <ConfirmDialog
+          title="Restore Rental"
+          message={`Restore rental RNT-${confirmRestoreRental} back to the active view?`}
+          confirmLabel="Restore"
+          confirmTone="amber"
+          onConfirm={() => { restoreRental(confirmRestoreRental); setConfirmRestoreRental(null); }}
+          onCancel={() => setConfirmRestoreRental(null)}
+        />
       )}
     </>
   );
@@ -944,6 +1027,8 @@ function CompatibilityPage({ data }) {
   const [notes,     setNotes]     = useState("");
   const [saving,    setSaving]    = useState(false);
   const [err,       setErr]       = useState(null);
+  const [confirmAddCompat, setConfirmAddCompat] = useState(false);
+  const [confirmRemoveCompat, setConfirmRemoveCompat] = useState(null);
 
   const cameraBodies = inventory.filter(i => i.CategoryName === "Camera Bodies" && !Number(i.Archived));
   const lenses       = inventory.filter(i => i.CategoryName === "Lenses"        && !Number(i.Archived));
@@ -987,7 +1072,7 @@ function CompatibilityPage({ data }) {
         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
       </svg>
       <span
-        onClick={() => removeCompat(id)}
+        onClick={() => setConfirmRemoveCompat(id)}
         title="Remove"
         style={{fontSize:10, color:"var(--rose)", cursor:"pointer", fontFamily:"'IBM Plex Mono',monospace", opacity:0.7}}
       >✕</span>
@@ -1061,6 +1146,26 @@ function CompatibilityPage({ data }) {
           {err && <div style={{color:"var(--rose)", fontSize:12.5, marginBottom:10}}>{err}</div>}
           <button onClick={addCompat} disabled={saving} style={buttonStyle}>{saving ? "Saving…" : "Add Compatibility"}</button>
         </Modal>
+      )}
+      {confirmAddCompat && (
+        <ConfirmDialog
+          title="Add Compatibility"
+          message={`Mark ${cameraBodies.find(c=>c.SerialNumber===selCamera)?.ItemName || selCamera} as compatible with ${lenses.find(l=>l.SerialNumber===selLens)?.ItemName || selLens}?`}
+          confirmLabel="Add Compatibility"
+          confirmTone="amber"
+          onConfirm={() => { setConfirmAddCompat(false); addCompat(); }}
+          onCancel={() => setConfirmAddCompat(false)}
+        />
+      )}
+      {confirmRemoveCompat && (
+        <ConfirmDialog
+          title="Remove Compatibility"
+          message="Remove this camera-lens compatibility pairing? This will update the customer-facing checker immediately."
+          confirmLabel="Remove"
+          confirmTone="rose"
+          onConfirm={() => { removeCompat(confirmRemoveCompat); setConfirmRemoveCompat(null); }}
+          onCancel={() => setConfirmRemoveCompat(null)}
+        />
       )}
     </>
   );

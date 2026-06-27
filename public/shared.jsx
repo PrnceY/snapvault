@@ -159,3 +159,31 @@ function fmtDate(d) {
   if (!d) return null;
   return new Date(d).toLocaleDateString("en-US", { month:"short", day:"2-digit" });
 }
+
+function ConfirmDialog({ title, message, confirmLabel, confirmTone, onConfirm, onCancel, children }) {
+  const btnColor = confirmTone === "rose" ? "var(--rose)" : confirmTone === "green" ? "var(--green)" : "var(--amber)";
+  const btnText  = confirmTone === "rose" ? "#fff" : "#1A1320";
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,9,13,0.72)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:60}} onClick={onCancel}>
+      <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:16,padding:"26px 28px",width:360,maxWidth:"90vw",boxShadow:"0 8px 40px rgba(0,0,0,0.5)"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+          <div style={{width:38,height:38,borderRadius:10,background:`${btnColor}1a`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {confirmTone === "rose"
+              ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={btnColor} strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={btnColor} strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+            }
+          </div>
+          <div>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:16}}>{title}</div>
+          </div>
+        </div>
+        <p style={{fontSize:13.5,color:"var(--muted)",lineHeight:1.6,marginBottom:16}}>{message}</p>
+        {children}
+        <div style={{display:"flex",gap:10,marginTop:4}}>
+          <button onClick={onCancel} style={{flex:1,padding:"10px",borderRadius:9,border:"1px solid var(--line)",background:"var(--card-hover)",color:"var(--text)",fontSize:13.5,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+          <button onClick={onConfirm} style={{flex:1,padding:"10px",borderRadius:9,border:"none",background:btnColor,color:btnText,fontSize:13.5,fontWeight:700,cursor:"pointer"}}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}

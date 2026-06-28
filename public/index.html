@@ -836,7 +836,7 @@ html, body {
           </div>
           <div style="margin-bottom:11px;">
             <label style="display:block;font-size:11px;color:#9C97A8;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;">Contact Number</label>
-            <input id="reg-contact" type="text" placeholder="09XX XXX XXXX" style="width:100%;background:#262430;border:1px solid #2C2A36;border-radius:8px;padding:9px 11px;color:#F3EFE6;font-size:13.5px;font-family:'Inter',sans-serif;outline:none;" />
+            <input id="reg-contact" type="tel" placeholder="09XXXXXXXXX" maxlength="11" style="width:100%;background:#262430;border:1px solid #2C2A36;border-radius:8px;padding:9px 11px;color:#F3EFE6;font-size:13.5px;font-family:'Inter',sans-serif;outline:none;" />
           </div>
           <div style="margin-bottom:11px;">
             <label style="display:block;font-size:11px;color:#9C97A8;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;">ID Type</label>
@@ -1000,6 +1000,20 @@ function openRegister() {
       errEl.style.display = 'block';
       return;
     }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      errEl.textContent = 'Please enter a valid email address (e.g. you@example.com).';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    if (contact && !/^09\d{9}$/.test(contact)) {
+      errEl.textContent = 'Contact number must start with 09 followed by 9 digits (e.g. 09171234567).';
+      errEl.style.display = 'block';
+      return;
+    }
+
     if (pw.length < 8) {
       errEl.textContent = 'Password must be at least 8 characters.';
       errEl.style.display = 'block';

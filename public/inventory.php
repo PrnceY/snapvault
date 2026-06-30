@@ -141,17 +141,22 @@ if ($action === 'restore') {
 }
 
 if ($action === 'edit') {
-    if (!$data || !isset($data['SerialNumber'])) {
+    // Edit now arrives as multipart (FormData) so it can carry an optional image,
+    // same shape as 'add'. Fall back to $data (JSON) if it's ever sent that way.
+    $serial     = $_POST['SerialNumber']      ?? ($data['SerialNumber']      ?? null);
+    $itemName   = $_POST['ItemName']          ?? ($data['ItemName']          ?? null);
+    $rentalRate = isset($_POST['RentalRate']) ? (float)$_POST['RentalRate']
+                 : (isset($data['RentalRate']) ? (float)$data['RentalRate'] : null);
+    $condition  = $_POST['ConditionStatus']   ?? ($data['ConditionStatus']   ?? null);
+    $status     = $_POST['Status']            ?? ($data['Status']            ?? null);
+    $categoryId = isset($_POST['CategoryID']) ? (int)$_POST['CategoryID']
+                 : (isset($data['CategoryID']) ? (int)$data['CategoryID'] : null);
+
+    if (!$serial) {
         http_response_code(400);
         echo json_encode(["success" => false, "error" => "Missing SerialNumber."]);
         exit;
     }
-    $serial     = $data['SerialNumber'];
-    $itemName   = $data['ItemName']       ?? null;
-    $rentalRate = isset($data['RentalRate']) ? (float)$data['RentalRate'] : null;
-    $condition  = $data['ConditionStatus'] ?? null;
-    $status     = $data['Status']          ?? null;
-    $categoryId = isset($data['CategoryID']) ? (int)$data['CategoryID'] : null;
 
     $fields = [];
     $types  = "";
@@ -162,6 +167,36 @@ if ($action === 'edit') {
     if ($condition  !== null) { $fields[] = "ConditionStatus = ?"; $types .= "s"; $vals[] = $condition; }
     if ($status     !== null) { $fields[] = "Status = ?";          $types .= "s"; $vals[] = $status; }
     if ($categoryId !== null) { $fields[] = "CategoryID = ?";      $types .= "i"; $vals[] = $categoryId; }
+
+    // Optional new image
+    if (isset($_FILES['Image']) && $_FILES['Image']['error'] === UPLOAD_ERR_OK) {
+        $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+        $ext = strtolower(pathinfo($_FILES['Image']['name'], PATHINFO_EXTENSION));
+
+        if (!in_array($ext, $allowed)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "error" => "Only JPG, PNG, or WEBP images are allowed."]);
+            exit;
+        }
+
+        $uploadDir = __DIR__ . '/uploads/inventory/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+
+        $filename = preg_replace('/[^A-Za-z0-9_-]/', '_', $serial) . '_' . time() . '.' . $ext;
+        $destination = $uploadDir . $filename;
+
+        if (move_uploaded_file($_FILES['Image']['tmp_name'], $destination)) {
+            $fields[] = "ImagePath = ?";
+            $types .= "s";
+            $vals[] = 'uploads/inventory/' . $filename;
+        } else {
+            http_response_code(500);
+            echo json_encode(["success" => false, "error" => "Failed to save uploaded image."]);
+            exit;
+        }
+    }
 
     if (empty($fields)) {
         echo json_encode(["success" => true]);

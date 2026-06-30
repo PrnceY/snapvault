@@ -225,6 +225,7 @@ function CategoriesPage({ data, setPage, setCategoryFilter }) {
 function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
   const { inventory, categories, refetch } = data;
   const [filter, setFilter] = useState("All");
+  const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ SerialNumber:"", CategoryID:"", ItemName:"", RentalRate:"", ConditionStatus:"Good", Status:"Available", Image:null });
   const [imagePreview, setImagePreview] = useState(null);
@@ -238,6 +239,11 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
   const rows = inventory.filter(i => {
     const isArchived = Number(i.Archived) === 1;
     const matchesCategory = categoryFilter === "All" || i.CategoryName === categoryFilter;
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q
+      || i.ItemName.toLowerCase().includes(q)
+      || i.SerialNumber.toLowerCase().includes(q);
+    if (!matchesSearch) return false;
     if (filter === "Archived") return isArchived && matchesCategory;
     if (isArchived) return false;
     return (filter === "All" || i.Status === filter) && matchesCategory;
@@ -314,6 +320,7 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
 
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [editImagePreview, setEditImagePreview] = useState(null);
   const [editError, setEditError] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
   const [confirmAdd, setConfirmAdd] = useState(false);
@@ -322,15 +329,22 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
   const submitEdit = () => {
     setEditSaving(true);
     setEditError(null);
-    fetch("inventory.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "edit", ...editForm }),
-    })
+
+    const body = new FormData();
+    body.append("action", "edit");
+    body.append("SerialNumber", editForm.SerialNumber);
+    body.append("ItemName", editForm.ItemName);
+    body.append("RentalRate", editForm.RentalRate || 0);
+    body.append("CategoryID", editForm.CategoryID);
+    body.append("ConditionStatus", editForm.ConditionStatus);
+    body.append("Status", editForm.Status);
+    if (editForm.Image) body.append("Image", editForm.Image);
+
+    fetch("inventory.php", { method: "POST", body })
       .then(r => r.json())
       .then(res => {
         setEditSaving(false);
-        if (res.success) { setEditingItem(null); refetch(); }
+        if (res.success) { setEditingItem(null); setEditImagePreview(null); refetch(); }
         else setEditError(res.error || "Something went wrong.");
       })
       .catch(() => { setEditSaving(false); setEditError("Could not reach the server."); });
@@ -338,6 +352,20 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
 
   return (
     <>
+      <div style={{position:"relative", marginBottom:14, maxWidth:320}}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2"
+          style={{position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none"}}>
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          type="text"
+          placeholder="Search by name or serial number…"
+          value={search}
+          onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+          style={{...inputStyle, paddingLeft:36}}
+        />
+      </div>
       <div className="pill-row" style={{justifyContent:"space-between", display:"flex", flexWrap:"wrap", gap:10}}>
         <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
           {statuses.map(s => (
@@ -383,7 +411,7 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
                         <span
                           title="Edit item"
                           style={{cursor:"pointer", color:"var(--muted)", display:"flex", alignItems:"center"}}
-                          onClick={() => { setEditingItem(i); setEditForm({ SerialNumber:i.SerialNumber, ItemName:i.ItemName, RentalRate:i.RentalRate||"", CategoryID: categories.find(c=>c.CategoryName===i.CategoryName)?.CategoryID||"", ConditionStatus:i.ConditionStatus, Status:i.Status }); setEditError(null); }}
+                          onClick={() => { setEditingItem(i); setEditForm({ SerialNumber:i.SerialNumber, ItemName:i.ItemName, RentalRate:i.RentalRate||"", CategoryID: categories.find(c=>c.CategoryName===i.CategoryName)?.CategoryID||"", ConditionStatus:i.ConditionStatus, Status:i.Status, Image:null }); setEditImagePreview(i.ImagePath || null); setEditError(null); }}
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </span>
@@ -525,6 +553,29 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
       {editingItem && (
         <Modal title={`Edit — ${editingItem.ItemName}`} onClose={() => setEditingItem(null)}>
           <div>
+            <FormField label="Photo">
+              <div style={{display:"flex", alignItems:"center", gap:12}}>
+                <div className="thumb thumb-large">
+                  {editImagePreview
+                    ? <img src={editImagePreview} alt="" />
+                    : icons.inventory}
+                </div>
+                <label style={{...buttonStyle, width:"auto", padding:"8px 14px", marginTop:0, display:"inline-block", cursor:"pointer", textAlign:"center"}}>
+                  Change Image
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    style={{display:"none"}}
+                    onChange={e => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      setEditForm({...editForm, Image:file});
+                      setEditImagePreview(URL.createObjectURL(file));
+                    }}
+                  />
+                </label>
+              </div>
+            </FormField>
             <FormField label="Item Name">
               <input style={inputStyle} value={editForm.ItemName} onChange={e => setEditForm({...editForm, ItemName:e.target.value})} />
             </FormField>

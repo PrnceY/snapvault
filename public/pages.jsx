@@ -922,7 +922,7 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
       </div>
       <Frame>
         <table>
-          <thead><tr><th>Rental ID</th><th>Customer</th><th>Item</th><th>Date out</th><th>Expected back</th><th>Actual return</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Rental ID</th><th>Customer</th><th>Item</th><th>Date out</th><th>Expected back</th><th>Actual return</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
             {rows.map(r => (
               <tr key={r.RentalID}>

@@ -39,26 +39,26 @@ if ($loginAs === 'customer') {
     exit;
 }
 
-if ($loginAs === 'admin') {
-    $stmt = $conn->prepare("SELECT UserID, PasswordHash FROM Admins WHERE Email = ?");
+if ($loginAs === 'shop') {
+    $stmt = $conn->prepare("SELECT UserID, PasswordHash FROM Shop WHERE Email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
-    $admin = $stmt->get_result()->fetch_assoc();
+    $shop = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
-    if (!$admin || !password_verify($password, $admin['PasswordHash'])) {
+    if (!$shop || !password_verify($password, $shop['PasswordHash'])) {
         $conn->close();
         http_response_code(401);
         echo json_encode(["success" => false, "error" => "Invalid email or password."]);
         exit;
     }
 
-    $_SESSION['adminID'] = $admin['UserID'];
-    $_SESSION['role']    = 'admin';
+    $_SESSION['shopID'] = $shop['UserID'];
+    $_SESSION['role']       = 'shop';
     $conn->close();
     echo json_encode([
         "success" => true,
-        "role"    => "admin",
+        "role"    => "shop",
         "name"    => null,
     ]);
     exit;

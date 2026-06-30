@@ -152,7 +152,7 @@ if ($action === 'upload_id') {
 }
 
 if ($action === 'verify') {
-    if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+    if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'shop') {
         http_response_code(403);
         echo json_encode(["success" => false, "error" => "Unauthorized"]);
         $conn->close();
@@ -171,7 +171,7 @@ if ($action === 'verify') {
 }
 
 if ($action === 'reject') {
-    if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+    if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'shop') {
         http_response_code(403);
         echo json_encode(["success" => false, "error" => "Unauthorized"]);
         $conn->close();

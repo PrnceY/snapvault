@@ -1012,7 +1012,7 @@ function CustomerProfile({ profile, rentals, onProfileUpdated }) {
       {showIdUpload && (
         <Modal title="Upload Government ID" onClose={() => { setShowIdUpload(false); setIdFile(null); setUploadErr(null); }}>
           <p style={{fontSize:12.5,color:'var(--muted)',marginBottom:14}}>
-            Upload a clear photo of your {profile.IDType || 'government-issued ID'}. An admin will review it shortly.
+            Upload a clear photo of your {profile.IDType || 'government-issued ID'}. Our shop staff will review it shortly.
           </p>
           <FormField label="ID Image">
             <input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setIdFile(e.target.files[0] || null)} style={inputStyle} />

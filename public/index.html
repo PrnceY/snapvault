@@ -766,14 +766,14 @@ html, body {
           </svg>
           Customer
         </button>
-        <button class="role-btn" id="btn-admin" onclick="setRole('admin')">
+        <button class="role-btn" id="btn-shop" onclick="setRole('shop')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
             <rect x="3" y="3" width="7" height="9" rx="1.5"/>
             <rect x="14" y="3" width="7" height="5" rx="1.5"/>
             <rect x="14" y="12" width="7" height="9" rx="1.5"/>
             <rect x="3" y="16" width="7" height="5" rx="1.5"/>
           </svg>
-          Admin
+          Shop
         </button>
       </div>
 
@@ -884,10 +884,10 @@ html, body {
       registerHtml: 'New customer? <a href="#">Create an account</a>',
       redirect: 'customer.html',
     },
-    admin: {
+    shop: {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>`,
-      text: 'Signing in as Admin — full access to inventory, rentals, deposits, and audit logs.',
-      registerHtml: 'Need admin access? <a href="#">Contact system owner</a>',
+      text: 'Signing in as Shop — full access to inventory, rentals, deposits, and audit logs.',
+      registerHtml: 'Need shop access? <a href="#">Contact system owner</a>',
       redirect: 'dashboard.html',
     },
   };
@@ -895,7 +895,7 @@ html, body {
   function setRole(role) {
     currentRole = role;
     document.getElementById('btn-customer').classList.toggle('active', role === 'customer');
-    document.getElementById('btn-admin').classList.toggle('active', role === 'admin');
+    document.getElementById('btn-shop').classList.toggle('active', role === 'shop');
 
     const meta = roleMeta[role];
     document.getElementById('role-badge').querySelector('svg').outerHTML; // noop

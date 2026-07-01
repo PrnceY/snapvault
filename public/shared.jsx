@@ -1,4 +1,4 @@
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 /* ---------------- Live data fetched from PHP/MariaDB ---------------- */
 
@@ -67,7 +67,7 @@ function Frame({ children, style }) {
   );
 }
 
-function Modal({ title, onClose, children }) {
+function Modal({ title, onClose, children, width }) {
   return (
     <div style={{
       position:"fixed", inset:0, background:"rgba(10,9,13,0.6)",
@@ -76,7 +76,7 @@ function Modal({ title, onClose, children }) {
       <div
         style={{
           background:"var(--card)", border:"1px solid var(--line)", borderRadius:14,
-          padding:"22px 24px", width:380, maxWidth:"90vw",
+          padding:"22px 24px", width: width || 380, maxWidth:"90vw",
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -95,6 +95,80 @@ function FormField({ label, children }) {
     <div style={{marginBottom:12}}>
       <label style={{display:"block", fontSize:11.5, color:"var(--muted)", marginBottom:5, textTransform:"uppercase", letterSpacing:0.3}}>{label}</label>
       {children}
+    </div>
+  );
+}
+
+function SearchableSelect({ options, value, onChange, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [brand, setBrand] = useState("");
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    function onClickOutside(e) {
+      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  const selected = options.find(o => o.value === value);
+  const brands = [...new Set(options.map(o => o.label.split(" ")[0]))].sort();
+  const filtered = options
+    .filter(o => !brand || o.label.split(" ")[0] === brand)
+    .filter(o => o.label.toLowerCase().includes(query.toLowerCase()));
+
+  return (
+    <div ref={boxRef} style={{position:"relative"}}>
+      <div
+        onClick={() => setOpen(o => !o)}
+        style={{...inputStyle, cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center"}}
+      >
+        <span style={{color: selected ? "var(--text)" : "var(--muted)"}}>{selected ? selected.label : (placeholder || "— Select —")}</span>
+        <span style={{color:"var(--muted)", fontSize:11}}>▾</span>
+      </div>
+      {open && (
+        <div style={{
+          position:"absolute", top:"calc(100% + 4px)", left:0, right:0, zIndex:10,
+          background:"var(--card)", border:"1px solid var(--line)", borderRadius:8,
+          maxHeight:320, overflowY:"auto", boxShadow:"0 8px 24px rgba(0,0,0,0.4)",
+        }}>
+          <div style={{display:"flex", borderBottom:"1px solid var(--line)"}}>
+            <input
+              autoFocus
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Type to search…"
+              style={{...inputStyle, flex:1, borderRadius:0, border:"none"}}
+            />
+            <select
+              value={brand}
+              onChange={e => setBrand(e.target.value)}
+              style={{...inputStyle, width:130, borderRadius:0, border:"none", borderLeft:"1px solid var(--line)"}}
+            >
+              <option value="">All brands</option>
+              {brands.map(b => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </div>
+          <div
+            onClick={() => { onChange(""); setOpen(false); setQuery(""); setBrand(""); }}
+            style={{padding:"9px 11px", fontSize:13, color:"var(--muted)", cursor:"pointer"}}
+          >{placeholder || "— Select —"}</div>
+          {filtered.map(o => (
+            <div
+              key={o.value}
+              onClick={() => { onChange(o.value); setOpen(false); setQuery(""); }}
+              style={{padding:"9px 11px", fontSize:13, cursor:"pointer", background: o.value===value ? "var(--card-hover)" : "transparent"}}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--card-hover)"}
+              onMouseLeave={e => e.currentTarget.style.background = o.value===value ? "var(--card-hover)" : "transparent"}
+            >{o.label}</div>
+          ))}
+          {filtered.length === 0 && (
+            <div style={{padding:"9px 11px", fontSize:12.5, color:"var(--muted)"}}>No matches.</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

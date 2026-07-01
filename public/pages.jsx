@@ -1075,6 +1075,9 @@ function CompatibilityPage({ data }) {
   const [err,       setErr]       = useState(null);
   const [confirmAddCompat, setConfirmAddCompat] = useState(false);
   const [confirmRemoveCompat, setConfirmRemoveCompat] = useState(null);
+  const [camFilter, setCamFilter]   = useState("");
+  const [lensFilter, setLensFilter] = useState("");
+  const [search, setSearch]         = useState("");
 
   const cameraBodies = inventory.filter(i => i.CategoryName === "Camera Bodies" && !Number(i.Archived));
   const lenses       = inventory.filter(i => i.CategoryName === "Lenses"        && !Number(i.Archived));
@@ -1137,39 +1140,60 @@ function CompatibilityPage({ data }) {
         </button>
       </div>
 
+      <div style={{display:"flex", gap:10, marginBottom:16, flexWrap:"wrap"}}>
+        <input
+          placeholder="Search camera or lens…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{...inputStyle, width:220}}
+        />
+        <select value={camFilter} onChange={e => setCamFilter(e.target.value)} style={{...inputStyle, width:200}}>
+          <option value="">All camera bodies</option>
+          {cameraBodies.map(c => <option key={c.SerialNumber} value={c.SerialNumber}>{c.ItemName}</option>)}
+        </select>
+        <select value={lensFilter} onChange={e => setLensFilter(e.target.value)} style={{...inputStyle, width:200}}>
+          <option value="">All lenses</option>
+          {lenses.map(l => <option key={l.SerialNumber} value={l.SerialNumber}>{l.ItemName}</option>)}
+        </select>
+      </div>
+
       <Frame>
-        <div style={{overflowX:"auto"}}>
-          <table style={{minWidth:500}}>
-            <thead>
-              <tr>
-                <th style={{...thStyle, textAlign:"left"}}>Camera Body</th>
-                {lenses.map(l => (
-                  <th key={l.SerialNumber} style={thStyle} title={l.ItemName}>
-                    {l.ItemName.length > 14 ? l.ItemName.slice(0,14)+"…" : l.ItemName}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {cameraBodies.length === 0 && (
-                <tr><td colSpan={lenses.length+1} style={{color:"var(--muted)",textAlign:"center",padding:24}}>No camera bodies in inventory.</td></tr>
-              )}
-              {cameraBodies.map(body => (
-                <tr key={body.SerialNumber}>
-                  <td style={{...tdStyle, textAlign:"left", fontWeight:500, fontSize:13}}>{body.ItemName}</td>
-                  {lenses.map(lens => {
-                    const entry = getCompatEntry(body.SerialNumber, lens.SerialNumber);
-                    return (
-                      <td key={lens.SerialNumber} style={tdStyle}>
-                        {entry ? checkIcon(entry.CompatibilityID) : <span style={{color:"var(--line)"}}>·</span>}
-                      </td>
-                    );
-                  })}
+        <table>
+          <thead>
+            <tr>
+              <th style={{...thStyle, textAlign:"left"}}>Camera Body</th>
+              <th style={{...thStyle, textAlign:"left"}}>Lens</th>
+              <th style={{...thStyle, textAlign:"left"}}>Notes</th>
+              <th style={thStyle}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {compat
+              .filter(c => (!camFilter || c.CameraSerial === camFilter) && (!lensFilter || c.LensSerial === lensFilter))
+              .filter(c => {
+                if (!search) return true;
+                const q = search.toLowerCase();
+                return c.CameraName.toLowerCase().includes(q) || c.LensName.toLowerCase().includes(q);
+              })
+              .map(c => (
+                <tr key={c.CompatibilityID}>
+                  <td style={{...tdStyle, textAlign:"left", fontWeight:500, fontSize:13}}>{c.CameraName}</td>
+                  <td style={{...tdStyle, textAlign:"left", fontSize:13}}>{c.LensName}</td>
+                  <td style={{...tdStyle, textAlign:"left", fontSize:12.5, color:"var(--muted)"}}>{c.Notes || "—"}</td>
+                  <td style={tdStyle}>
+                    <span
+                      onClick={() => setConfirmRemoveCompat(c.CompatibilityID)}
+                      title="Remove"
+                      style={{fontSize:12, color:"var(--rose)", cursor:"pointer", fontFamily:"'IBM Plex Mono',monospace"}}
+                    >Remove</span>
+                  </td>
                 </tr>
               ))}
-            </tbody>
-          </table>
-        </div>
+            {compat.length === 0 && (
+              <tr><td colSpan={4} style={{color:"var(--muted)",textAlign:"center",padding:24}}>No compatibility pairs yet.</td></tr>
+            )}
+          </tbody>
+        </table>
       </Frame>
 
       {showModal && (

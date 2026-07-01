@@ -632,7 +632,7 @@ function CustomersPage({ data }) {
   const { customers, refetch } = data;
   const [filter, setFilter] = useState("All");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ FullName:"", IDType:"School ID", ContactNumber:"", Verified:false });
+  const [form, setForm] = useState({ FullName:"", IDType:"School ID", ContactNumber:"" });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
   const [reviewing, setReviewing] = useState(null);
@@ -757,12 +757,6 @@ function CustomersPage({ data }) {
             </FormField>
             <FormField label="Contact Number">
               <input style={inputStyle} value={form.ContactNumber} onChange={e => setForm({...form, ContactNumber:e.target.value})} placeholder="e.g. 0917 000 0000" />
-            </FormField>
-            <FormField label="Verified">
-              <label style={{display:"flex", alignItems:"center", gap:8, fontSize:13}}>
-                <input type="checkbox" checked={form.Verified} onChange={e => setForm({...form, Verified:e.target.checked})} />
-                ID has been verified
-              </label>
             </FormField>
             {formError && <p style={{color:"var(--rose)", fontSize:12.5, marginTop:4}}>{formError}</p>}
             <button type="submit" style={buttonStyle} disabled={saving}>{saving ? "Saving…" : "Add Customer"}</button>
@@ -1311,7 +1305,7 @@ function ReportsPage({ data }) {
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:12,fontFamily:"'IBM Plex Mono',monospace",color:"var(--amber)",fontWeight:600}}>{count} rentals</div>
-                  <Chip tone={cust?.Verified ? "green" : "amber"} style={{marginTop:2}}>{cust?.Verified ? "Active" : "Pending"}</Chip>
+                  <Chip tone={cust?.VerificationStatus === "Verified" ? "green" : "amber"} style={{marginTop:2}}>{cust?.VerificationStatus === "Verified" ? "Active" : "Pending"}</Chip>
                 </div>
               </div>
             );
@@ -1340,7 +1334,7 @@ function AuditLogsPage({ data }) {
     }
   });
   customers.forEach(c => {
-    if (c.Verified) {
+    if (c.VerificationStatus === "Verified") {
       logs.push({ action:"Customer Verified", detail:`ID verified for ${c.FullName} (C-${String(c.CustomerID).padStart(3,'0')})`, date: null, type:"customer" });
     }
   });

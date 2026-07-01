@@ -5,7 +5,7 @@ include 'db_connect.php';
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    $sql = "SELECT CustomerID, FullName, IDType, ContactNumber, Verified, IDImagePath, VerificationStatus FROM Customers";
+    $sql = "SELECT CustomerID, FullName, IDType, ContactNumber, IDImagePath, VerificationStatus FROM Customers";
     $result = $conn->query($sql);
     $rows = [];
     while ($row = $result->fetch_assoc()) {
@@ -52,7 +52,7 @@ if ($action === 'add') {
 
     $conn->begin_transaction();
     try {
-        $s1 = $conn->prepare("INSERT INTO Customers (FullName, IDType, ContactNumber, Verified, Email, PasswordHash) VALUES (?, ?, ?, 0, ?, ?)");
+        $s1 = $conn->prepare("INSERT INTO Customers (FullName, IDType, ContactNumber, Email, PasswordHash) VALUES (?, ?, ?, ?, ?)");
         $s1->bind_param("sssss", $fullName, $idType, $contact, $email, $hash);
         $s1->execute();
         $customerId = $conn->insert_id;
@@ -160,7 +160,7 @@ if ($action === 'verify') {
     }
 
     $customerId = (int)($data['CustomerID'] ?? 0);
-    $stmt = $conn->prepare("UPDATE Customers SET VerificationStatus = 'Verified', Verified = 1 WHERE CustomerID = ?");
+    $stmt = $conn->prepare("UPDATE Customers SET VerificationStatus = 'Verified' WHERE CustomerID = ?");
     $stmt->bind_param("i", $customerId);
     $stmt->execute()
         ? print(json_encode(["success" => true]))
@@ -179,7 +179,7 @@ if ($action === 'reject') {
     }
 
     $customerId = (int)($data['CustomerID'] ?? 0);
-    $stmt = $conn->prepare("UPDATE Customers SET VerificationStatus = 'Unverified', Verified = 0, IDImagePath = NULL WHERE CustomerID = ?");
+    $stmt = $conn->prepare("UPDATE Customers SET VerificationStatus = 'Unverified', IDImagePath = NULL WHERE CustomerID = ?");
     $stmt->bind_param("i", $customerId);
     $stmt->execute()
         ? print(json_encode(["success" => true]))

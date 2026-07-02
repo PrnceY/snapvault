@@ -541,17 +541,21 @@ function CustomerCompat({ data }) {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
           <div>
             <label style={{display:'block',fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:7}}>Select Camera Body</label>
-            <select value={selBody} onChange={e=>{setSelBody(e.target.value);setSelLens('');}} style={{...inputStyle}}>
-              <option value="">— Choose camera body —</option>
-              {bodies.map(b=><option key={b.SerialNumber} value={b.SerialNumber}>{b.ItemName}</option>)}
-            </select>
+            <SearchableSelect
+              options={bodies.map(b=>({ value:b.SerialNumber, label:b.ItemName }))}
+              value={selBody}
+              onChange={v=>{setSelBody(v);setSelLens('');}}
+              placeholder="— Choose camera body —"
+            />
           </div>
           <div>
             <label style={{display:'block',fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:7}}>Or Select a Lens</label>
-            <select value={selLens} onChange={e=>{setSelLens(e.target.value);setSelBody('');}} style={{...inputStyle}}>
-              <option value="">— Choose lens —</option>
-              {lenses.map(l=><option key={l.SerialNumber} value={l.SerialNumber}>{l.ItemName}</option>)}
-            </select>
+            <SearchableSelect
+              options={lenses.map(l=>({ value:l.SerialNumber, label:l.ItemName }))}
+              value={selLens}
+              onChange={v=>{setSelLens(v);setSelBody('');}}
+              placeholder="— Choose lens —"
+            />
           </div>
         </div>
       </div>
@@ -590,6 +594,8 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onCons
   const [selCat, setSelCat]   = useState(preselectItem ? preselectItem.CategoryName : null);   // selected category name
   const [cart, setCart]       = useState(preselectItem ? [preselectItem] : []);      // array of item objects
   const [days, setDays]       = useState(1);
+  const [itemPage, setItemPage] = useState(1);
+  const ITEMS_PER_PAGE = 8;
   const [agreed, setAgreed]   = useState(false);
   const [saving, setSaving]   = useState(false);
   const [refNum, setRefNum]   = useState(null);
@@ -708,7 +714,7 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onCons
                 {availableCats.map(c => {
                   const count = available.filter(i => i.CategoryName === c.CategoryName).length;
                   return (
-                    <div key={c.CategoryID} onClick={() => setSelCat(c.CategoryName)}
+                    <div key={c.CategoryID} onClick={() => { setSelCat(c.CategoryName); setItemPage(1); }}
                       style={{padding:'18px 20px',borderRadius:12,border:'1px solid var(--line)',background:'var(--card-hover)',cursor:'pointer',transition:'border-color .15s,transform .15s'}}
                       onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(255,180,84,0.5)';e.currentTarget.style.transform='translateY(-2px)';}}
                       onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--line)';e.currentTarget.style.transform='none';}}
@@ -728,7 +734,7 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onCons
             {selCat && (
               <>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
-                  {catItems.map(item => {
+                  {catItems.slice((itemPage-1)*ITEMS_PER_PAGE, itemPage*ITEMS_PER_PAGE).map(item => {
                     const selected = inCart(item);
                     return (
                       <div key={item.SerialNumber} onClick={() => toggleCart(item)}
@@ -746,6 +752,24 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onCons
                     );
                   })}
                 </div>
+
+                {catItems.length > ITEMS_PER_PAGE && (
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,marginBottom:16}}>
+                    <button
+                      disabled={itemPage === 1}
+                      onClick={() => setItemPage(p => p - 1)}
+                      style={{background:'var(--card-hover)',border:'1px solid var(--line)',borderRadius:8,color:'var(--text)',padding:'6px 12px',fontSize:12.5,cursor: itemPage===1 ? 'default':'pointer',opacity: itemPage===1 ? 0.4:1}}
+                    >← Prev</button>
+                    <span style={{fontSize:12,color:'var(--muted)',fontFamily:"'IBM Plex Mono',monospace"}}>
+                      Page {itemPage} of {Math.ceil(catItems.length / ITEMS_PER_PAGE)}
+                    </span>
+                    <button
+                      disabled={itemPage >= Math.ceil(catItems.length / ITEMS_PER_PAGE)}
+                      onClick={() => setItemPage(p => p + 1)}
+                      style={{background:'var(--card-hover)',border:'1px solid var(--line)',borderRadius:8,color:'var(--text)',padding:'6px 12px',fontSize:12.5,cursor: itemPage>=Math.ceil(catItems.length/ITEMS_PER_PAGE) ? 'default':'pointer',opacity: itemPage>=Math.ceil(catItems.length/ITEMS_PER_PAGE) ? 0.4:1}}
+                    >Next →</button>
+                  </div>
+                )}
 
                 {/* Cart summary bar */}
                 {cart.length > 0 && (

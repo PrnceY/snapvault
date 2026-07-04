@@ -4,7 +4,7 @@ include 'db_connect.php';
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    $sql = "SELECT i.InventoryID, i.SerialNumber, i.ItemName, i.RentalRate, i.ImagePath, i.ConditionStatus, i.Status, i.Archived, c.CategoryName
+    $sql = "SELECT i.InventoryID, i.SerialNumber, i.ItemName, i.Brand, i.Model, i.RentalRate, i.ImagePath, i.ConditionStatus, i.Status, i.Archived, c.CategoryName
         FROM Inventory i
         JOIN Equipment_Categories c ON i.CategoryID = c.CategoryID";
     $result = $conn->query($sql);
@@ -30,9 +30,10 @@ if ($action === 'add') {
     $serial = $_POST['SerialNumber'] ?? null;
     $categoryId = isset($_POST['CategoryID']) ? (int)$_POST['CategoryID'] : null;
     $itemName = $_POST['ItemName'] ?? null;
+    $brand = $_POST['Brand'] ?? null;
+    $model = $_POST['Model'] ?? null;
     $rentalRate = isset($_POST['RentalRate']) ? (float)$_POST['RentalRate'] : 0.00;
     $condition = $_POST['ConditionStatus'] ?? 'Good';
-    $status = $_POST['Status'] ?? 'Available';
     $status = $_POST['Status'] ?? 'Available';
 
     if (!$serial || !$categoryId || !$itemName) {
@@ -70,8 +71,8 @@ if ($action === 'add') {
         }
     }
 
-    $stmt = $conn->prepare("INSERT INTO Inventory (ShopID, SerialNumber, CategoryID, ItemName, RentalRate, ImagePath, ConditionStatus, Status) VALUES ((SELECT ShopID FROM Shop LIMIT 1), ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("sisdsss", $serial, $categoryId, $itemName, $rentalRate, $imagePath, $condition, $status);
+    $stmt = $conn->prepare("INSERT INTO Inventory (ShopID, SerialNumber, CategoryID, ItemName, Brand, Model, RentalRate, ImagePath, ConditionStatus, Status) VALUES ((SELECT ShopID FROM Shop LIMIT 1), ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("sisssdsss", $serial, $categoryId, $itemName, $brand, $model, $rentalRate, $imagePath, $condition, $status);
 
     if ($stmt->execute()) {
         echo json_encode(["success" => true]);
@@ -145,6 +146,8 @@ if ($action === 'edit') {
     // same shape as 'add'. Fall back to $data (JSON) if it's ever sent that way.
     $serial     = $_POST['SerialNumber']      ?? ($data['SerialNumber']      ?? null);
     $itemName   = $_POST['ItemName']          ?? ($data['ItemName']          ?? null);
+    $brand      = $_POST['Brand']             ?? ($data['Brand']             ?? null);
+    $model      = $_POST['Model']             ?? ($data['Model']             ?? null);
     $rentalRate = isset($_POST['RentalRate']) ? (float)$_POST['RentalRate']
                  : (isset($data['RentalRate']) ? (float)$data['RentalRate'] : null);
     $condition  = $_POST['ConditionStatus']   ?? ($data['ConditionStatus']   ?? null);
@@ -163,6 +166,8 @@ if ($action === 'edit') {
     $vals   = [];
 
     if ($itemName   !== null) { $fields[] = "ItemName = ?";        $types .= "s"; $vals[] = $itemName; }
+    if ($brand      !== null) { $fields[] = "Brand = ?";           $types .= "s"; $vals[] = $brand; }
+    if ($model      !== null) { $fields[] = "Model = ?";           $types .= "s"; $vals[] = $model; }
     if ($rentalRate !== null) { $fields[] = "RentalRate = ?";      $types .= "d"; $vals[] = $rentalRate; }
     if ($condition  !== null) { $fields[] = "ConditionStatus = ?"; $types .= "s"; $vals[] = $condition; }
     if ($status     !== null) { $fields[] = "Status = ?";          $types .= "s"; $vals[] = $status; }

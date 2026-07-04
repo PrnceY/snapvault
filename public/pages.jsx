@@ -227,7 +227,7 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ SerialNumber:"", CategoryID:"", ItemName:"", RentalRate:"", ConditionStatus:"Good", Status:"Available", Image:null });
+  const [form, setForm] = useState({ SerialNumber:"", CategoryID:"", ItemName:"", Brand:"", Model:"", RentalRate:"", ConditionStatus:"Good", Status:"Available", Image:null });
   const [imagePreview, setImagePreview] = useState(null);
   const [deletingItem, setDeletingItem] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -265,6 +265,8 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
     body.append("SerialNumber", form.SerialNumber);
     body.append("CategoryID", form.CategoryID);
     body.append("ItemName", form.ItemName);
+    body.append("Brand", form.Brand || "");
+    body.append("Model", form.Model || "");
     body.append("ConditionStatus", form.ConditionStatus);
     body.append("Status", form.Status);
     body.append("RentalRate", form.RentalRate || 0);
@@ -276,7 +278,7 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
         setSaving(false);
         if (res.success) {
           setShowForm(false);
-          setForm({ SerialNumber:"", CategoryID:"", ItemName:"", RentalRate:"", ConditionStatus:"Good", Status:"Available", Image:null });
+          setForm({ SerialNumber:"", CategoryID:"", ItemName:"", Brand:"", Model:"", RentalRate:"", ConditionStatus:"Good", Status:"Available", Image:null });
           setImagePreview(null);
           refetch();
         } else {
@@ -334,6 +336,8 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
     body.append("action", "edit");
     body.append("SerialNumber", editForm.SerialNumber);
     body.append("ItemName", editForm.ItemName);
+    body.append("Brand", editForm.Brand || "");
+    body.append("Model", editForm.Model || "");
     body.append("RentalRate", editForm.RentalRate || 0);
     body.append("CategoryID", editForm.CategoryID);
     body.append("ConditionStatus", editForm.ConditionStatus);
@@ -411,7 +415,7 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
                         <span
                           title="Edit item"
                           style={{cursor:"pointer", color:"var(--muted)", display:"flex", alignItems:"center"}}
-                          onClick={() => { setEditingItem(i); setEditForm({ SerialNumber:i.SerialNumber, ItemName:i.ItemName, RentalRate:i.RentalRate||"", CategoryID: categories.find(c=>c.CategoryName===i.CategoryName)?.CategoryID||"", ConditionStatus:i.ConditionStatus, Status:i.Status, Image:null }); setEditImagePreview(i.ImagePath || null); setEditError(null); }}
+                          onClick={() => { setEditingItem(i); setEditForm({ SerialNumber:i.SerialNumber, ItemName:i.ItemName, Brand:i.Brand||"", Model:i.Model||"", RentalRate:i.RentalRate||"", CategoryID: categories.find(c=>c.CategoryName===i.CategoryName)?.CategoryID||"", ConditionStatus:i.ConditionStatus, Status:i.Status, Image:null }); setEditImagePreview(i.ImagePath || null); setEditError(null); }}
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </span>
@@ -502,6 +506,12 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
             <FormField label="Item Name">
               <input style={inputStyle} value={form.ItemName} onChange={e => setForm({...form, ItemName:e.target.value})} placeholder="e.g. Canon EOS R6" />
             </FormField>
+            <FormField label="Brand">
+              <input style={inputStyle} value={form.Brand} onChange={e => setForm({...form, Brand:e.target.value})} placeholder="e.g. Canon" />
+            </FormField>
+            <FormField label="Model">
+              <input style={inputStyle} value={form.Model} onChange={e => setForm({...form, Model:e.target.value})} placeholder="e.g. EOS R6" />
+            </FormField>
             <FormField label="Rental Rate (₱/day)">
               <input type="number" min="0" style={inputStyle} value={form.RentalRate || ""} onChange={e => setForm({...form, RentalRate:e.target.value})} placeholder="e.g. 1500" />
             </FormField>
@@ -578,6 +588,12 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
             </FormField>
             <FormField label="Item Name">
               <input style={inputStyle} value={editForm.ItemName} onChange={e => setEditForm({...editForm, ItemName:e.target.value})} />
+            </FormField>
+            <FormField label="Brand">
+              <input style={inputStyle} value={editForm.Brand || ""} onChange={e => setEditForm({...editForm, Brand:e.target.value})} placeholder="e.g. Canon" />
+            </FormField>
+            <FormField label="Model">
+              <input style={inputStyle} value={editForm.Model || ""} onChange={e => setEditForm({...editForm, Model:e.target.value})} placeholder="e.g. EOS R6" />
             </FormField>
             <FormField label="Rental Rate (₱/day)">
               <input type="number" min="0" style={inputStyle} value={editForm.RentalRate} onChange={e => setEditForm({...editForm, RentalRate:e.target.value})} placeholder="e.g. 1500" />

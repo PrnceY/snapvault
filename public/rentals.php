@@ -6,12 +6,12 @@ $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'GET') {
     $sql = "SELECT r.RentalID, c.FullName AS Customer,
                GROUP_CONCAT(i.ItemName SEPARATOR ', ') AS Item,
-               r.DateOut, r.ExpectedBack, r.ActualReturn, r.Archived
+               r.DateOut, r.ExpectedBack, r.ActualReturn, r.Status, r.Archived
         FROM Rentals r
         JOIN Customers c ON r.CustomerID = c.CustomerID
         JOIN Rental_Items ri ON ri.RentalID = r.RentalID
-        JOIN Inventory i ON i.SerialNumber = ri.SerialNumber
-        GROUP BY r.RentalID, c.FullName, r.DateOut, r.ExpectedBack, r.ActualReturn, r.Archived";
+        JOIN Inventory i ON i.InventoryID = ri.InventoryID
+        GROUP BY r.RentalID, c.FullName, r.DateOut, r.ExpectedBack, r.ActualReturn, r.Status, r.Archived";
     $result = $conn->query($sql);
     $rows = [];
     while ($row = $result->fetch_assoc()) {
@@ -49,8 +49,17 @@ if ($action === 'create') {
         $stmt->close();
 
         foreach ($serials as $serial) {
-            $stmt = $conn->prepare("INSERT INTO Rental_Items (RentalID, SerialNumber) VALUES (?, ?)");
-            $stmt->bind_param("is", $rentalId, $serial);
+            $lookup = $conn->prepare("SELECT InventoryID, RentalRate FROM Inventory WHERE SerialNumber = ?");
+            $lookup->bind_param("s", $serial);
+            $lookup->execute();
+            $item = $lookup->get_result()->fetch_assoc();
+            $lookup->close();
+
+            $inventoryId = $item['InventoryID'];
+            $agreedRate  = $item['RentalRate'];
+
+            $stmt = $conn->prepare("INSERT INTO Rental_Items (RentalID, InventoryID, AgreedRate) VALUES (?, ?, ?)");
+            $stmt->bind_param("iid", $rentalId, $inventoryId, $agreedRate);
             $stmt->execute();
             $stmt->close();
 
@@ -89,7 +98,7 @@ if ($action === 'return') {
     $conn->begin_transaction();
 
     try {
-        $stmt = $conn->prepare("SELECT SerialNumber FROM Rental_Items WHERE RentalID = ?");
+        $stmt = $conn->prepare("SELECT InventoryID FROM Rental_Items WHERE RentalID = ?");
         $stmt->bind_param("i", $rentalId);
         $stmt->execute();
         $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -100,8 +109,8 @@ if ($action === 'return') {
         }
 
         foreach ($items as $item) {
-            $s = $conn->prepare("UPDATE Inventory SET Status = 'Available' WHERE SerialNumber = ?");
-            $s->bind_param("s", $item['SerialNumber']);
+            $s = $conn->prepare("UPDATE Inventory SET Status = 'Available' WHERE InventoryID = ?");
+            $s->bind_param("i", $item['InventoryID']);
             $s->execute();
             $s->close();
         }
@@ -111,7 +120,7 @@ if ($action === 'return') {
         $stmt->execute();
         $stmt->close();
 
-        $stmt = $conn->prepare("UPDATE Rentals SET ActualReturn = NOW() WHERE RentalID = ?");
+        $stmt = $conn->prepare("UPDATE Rentals SET ActualReturn = NOW(), Status = 'Completed' WHERE RentalID = ?");
         $stmt->bind_param("i", $rentalId);
         $stmt->execute();
         $stmt->close();

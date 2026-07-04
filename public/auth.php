@@ -40,7 +40,7 @@ if ($loginAs === 'customer') {
 }
 
 if ($loginAs === 'shop') {
-    $stmt = $conn->prepare("SELECT UserID, PasswordHash FROM Shop WHERE Email = ?");
+    $stmt = $conn->prepare("SELECT ShopID, PasswordHash FROM Shop WHERE Email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $shop = $stmt->get_result()->fetch_assoc();
@@ -53,7 +53,7 @@ if ($loginAs === 'shop') {
         exit;
     }
 
-    $_SESSION['shopID'] = $shop['UserID'];
+    $_SESSION['shopID'] = $shop['ShopID'];
     $_SESSION['role']       = 'shop';
     $conn->close();
     echo json_encode([

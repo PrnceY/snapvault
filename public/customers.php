@@ -52,7 +52,7 @@ if ($action === 'add') {
 
     $conn->begin_transaction();
     try {
-        $s1 = $conn->prepare("INSERT INTO Customers (FullName, IDType, ContactNumber, Email, PasswordHash) VALUES (?, ?, ?, ?, ?)");
+        $s1 = $conn->prepare("INSERT INTO Customers (ShopID, FullName, IDType, ContactNumber, Email, PasswordHash) VALUES ((SELECT ShopID FROM Shop LIMIT 1), ?, ?, ?, ?, ?)");
         $s1->bind_param("sssss", $fullName, $idType, $contact, $email, $hash);
         $s1->execute();
         $customerId = $conn->insert_id;

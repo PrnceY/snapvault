@@ -25,7 +25,7 @@ $stmt = $conn->prepare("
            d.AmountHeld, d.RefundStatus
     FROM Rentals r
     JOIN Rental_Items ri ON ri.RentalID = r.RentalID
-    JOIN Inventory i ON i.SerialNumber = ri.SerialNumber
+    JOIN Inventory i ON i.InventoryID = ri.InventoryID
     LEFT JOIN Deposits d ON d.RentalID = r.RentalID
     WHERE r.CustomerID = ?
     GROUP BY r.RentalID, r.DateOut, r.ExpectedBack, r.ActualReturn, d.AmountHeld, d.RefundStatus

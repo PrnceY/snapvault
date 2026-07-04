@@ -4,7 +4,7 @@ include 'db_connect.php';
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    $sql = "SELECT i.SerialNumber, i.ItemName, i.RentalRate, i.ImagePath, i.ConditionStatus, i.Status, i.Archived, c.CategoryName
+    $sql = "SELECT i.InventoryID, i.SerialNumber, i.ItemName, i.RentalRate, i.ImagePath, i.ConditionStatus, i.Status, i.Archived, c.CategoryName
         FROM Inventory i
         JOIN Equipment_Categories c ON i.CategoryID = c.CategoryID";
     $result = $conn->query($sql);
@@ -70,7 +70,7 @@ if ($action === 'add') {
         }
     }
 
-    $stmt = $conn->prepare("INSERT INTO Inventory (SerialNumber, CategoryID, ItemName, RentalRate, ImagePath, ConditionStatus, Status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt = $conn->prepare("INSERT INTO Inventory (ShopID, SerialNumber, CategoryID, ItemName, RentalRate, ImagePath, ConditionStatus, Status) VALUES ((SELECT ShopID FROM Shop LIMIT 1), ?, ?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("sisdsss", $serial, $categoryId, $itemName, $rentalRate, $imagePath, $condition, $status);
 
     if ($stmt->execute()) {
@@ -92,7 +92,7 @@ if ($action === 'delete') {
     }
     $serial = $data['SerialNumber'];
 
-    $stmt = $conn->prepare("SELECT COUNT(*) AS cnt FROM Rental_Items ri JOIN Rentals r ON r.RentalID = ri.RentalID WHERE ri.SerialNumber = ? AND r.ActualReturn IS NULL");
+    $stmt = $conn->prepare("SELECT COUNT(*) AS cnt FROM Rental_Items ri JOIN Rentals r ON r.RentalID = ri.RentalID JOIN Inventory inv ON inv.InventoryID = ri.InventoryID WHERE inv.SerialNumber = ? AND r.ActualReturn IS NULL");
     $stmt->bind_param("s", $serial);
     $stmt->execute();
     $activeCount = $stmt->get_result()->fetch_assoc()['cnt'];

@@ -22,13 +22,13 @@ $stmt = $conn->prepare("
     SELECT r.RentalID,
            GROUP_CONCAT(i.ItemName SEPARATOR ', ') AS Item,
            r.DateOut, r.ExpectedBack, r.ActualReturn,
-           d.AmountHeld, d.RefundStatus
+           d.DepositID, d.AmountHeld, d.RefundStatus
     FROM Rentals r
     JOIN Rental_Items ri ON ri.RentalID = r.RentalID
     JOIN Inventory i ON i.InventoryID = ri.InventoryID
     LEFT JOIN Deposits d ON d.RentalID = r.RentalID
     WHERE r.CustomerID = ?
-    GROUP BY r.RentalID, r.DateOut, r.ExpectedBack, r.ActualReturn, d.AmountHeld, d.RefundStatus
+    GROUP BY r.RentalID, r.DateOut, r.ExpectedBack, r.ActualReturn, d.DepositID, d.AmountHeld, d.RefundStatus
     ORDER BY r.DateOut DESC
 ");
 $stmt->bind_param("i", $customerID);

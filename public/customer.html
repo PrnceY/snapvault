@@ -302,7 +302,7 @@ function CustomerApp() {
                         const tone   = status==='Active'?'green':status==='Overdue'?'rose':'muted';
                         return (
                           <tr key={r.RentalID}>
-                            <td><span style={{color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12}}>RNT-{String(r.RentalID).padStart(7,'0').replace(/^(\d{4})(\d+)/,'$1-$2')}</span></td>
+                            <td><span style={{color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12}}>RNT-{r.RentalID}</span></td>
                             <td>{r.Item}</td>
                             <td className="mono-cell">{fmtDate(r.DateOut)}</td>
                             <td className="mono-cell">{fmtDate(r.ExpectedBack)}</td>
@@ -870,7 +870,7 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onCons
             <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:18,marginBottom:8}}>Request Submitted!</div>
             <div style={{fontSize:13,color:'var(--muted)',marginBottom:16}}>Your reference number is</div>
             <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:18,color:'var(--amber)',fontWeight:600,marginBottom:20}}>
-              RNT-{String(refNum || '').padStart(7, '0').replace(/^(\d{4})(\d+)/, '$1-$2')}
+              RNT-{refNum}
             </div>
             <button onClick={onSuccess} style={buttonStyle}>Back to Dashboard</button>
           </div>
@@ -1063,8 +1063,8 @@ function CustomerProfile({ profile, rentals, onProfileUpdated }) {
             <tbody>
               {deposits.map((r,i)=>(
                 <tr key={i}>
-                  <td style={{padding:'12px',borderBottom:'1px solid var(--line)',color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12}}>DEP-{String(r.RentalID).padStart(7,'0').replace(/^(\d{4})(\d+)/,'2024-$2')}</td>
-                  <td style={{padding:'12px',borderBottom:'1px solid var(--line)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:'var(--muted)'}}>RNT-{String(r.RentalID).padStart(7,'0').replace(/^(\d{4})(\d+)/,'2024-$2')}</td>
+                  <td style={{padding:'12px',borderBottom:'1px solid var(--line)',color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12}}>DEP-{r.DepositID}</td>
+                  <td style={{padding:'12px',borderBottom:'1px solid var(--line)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:'var(--muted)'}}>RNT-{r.RentalID}</td>
                   <td style={{padding:'12px',borderBottom:'1px solid var(--line)',fontFamily:"'IBM Plex Mono',monospace",fontSize:13}}>₱{parseFloat(r.AmountHeld||0).toLocaleString()}</td>
                   <td style={{padding:'12px',borderBottom:'1px solid var(--line)'}}><Chip tone={depTone(r.RefundStatus)}>{depLabel(r.RefundStatus)}</Chip></td>
                 </tr>

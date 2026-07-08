@@ -1204,49 +1204,6 @@ function DepositsPage({ data }) {
           </tbody>
         </table>
       </Frame>
-
-      {totalPages > 1 && (
-        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:14, padding:"0 4px"}}>
-          <span style={{fontSize:12, color:"var(--muted)", fontFamily:"'IBM Plex Mono',monospace"}}>
-            {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} logs
-          </span>
-          <div style={{display:"flex", gap:6}}>
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={safePage === 1}
-              style={{padding:"6px 13px", borderRadius:8, border:"1px solid var(--line)", background:"var(--card)", color: safePage === 1 ? "var(--muted)" : "var(--text)", cursor: safePage === 1 ? "default" : "pointer", fontSize:12, fontFamily:"'Inter',sans-serif"}}
-            >
-              ← Prev
-            </button>
-            {Array.from({length: totalPages}, (_, i) => i + 1)
-              .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
-              .reduce((acc, p, idx, arr) => {
-                if (idx > 0 && p - arr[idx - 1] > 1) acc.push("...");
-                acc.push(p);
-                return acc;
-              }, [])
-              .map((p, idx) => p === "..." ? (
-                <span key={`ellipsis-${idx}`} style={{padding:"6px 4px", color:"var(--muted)", fontSize:12}}>…</span>
-              ) : (
-                <button
-                  key={p}
-                  onClick={() => setCurrentPage(p)}
-                  style={{padding:"6px 11px", borderRadius:8, border:"1px solid", borderColor: p === safePage ? "var(--amber)" : "var(--line)", background: p === safePage ? "var(--amber)" : "var(--card)", color: p === safePage ? "#1A1320" : "var(--text)", cursor:"pointer", fontSize:12, fontWeight: p === safePage ? 600 : 400, fontFamily:"'Inter',sans-serif"}}
-                >
-                  {p}
-                </button>
-              ))
-            }
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={safePage === totalPages}
-              style={{padding:"6px 13px", borderRadius:8, border:"1px solid var(--line)", background:"var(--card)", color: safePage === totalPages ? "var(--muted)" : "var(--text)", cursor: safePage === totalPages ? "default" : "pointer", fontSize:12, fontFamily:"'Inter',sans-serif"}}
-            >
-              Next →
-            </button>
-          </div>
-        </div>
-      )}
     </>
   );
 }

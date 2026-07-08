@@ -55,7 +55,7 @@ function Dashboard({ data, setPage, setRentalFilter }) {
           <div className="num">{availableUnits}</div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <span className="lab">Available for rental</span>
-            <span style={{fontSize:11,color:"var(--green)",fontFamily:"'IBM Plex Mono',monospace"}}>+{inventory.filter(i=>Number(i.Archived)===0).length} total</span>
+            <span style={{fontSize:11,color:"var(--muted)",fontFamily:"'IBM Plex Mono',monospace"}}>{inventory.filter(i=>Number(i.Archived)===0).length} items total</span>
           </div>
         </div>
 
@@ -926,7 +926,15 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
                 <td className="mono-cell">{fmtDate(r.DateOut)}</td>
                 <td className="mono-cell">{fmtDate(r.ExpectedBack)}</td>
                 <td className="mono-cell">{r.ActualReturn ? fmtDate(r.ActualReturn) : "—"}</td>
-                <td><Chip tone={Number(r.Archived) === 1 ? "muted" : statusTone(r.ActualReturn ? "Done" : "Rented")}>{Number(r.Archived) === 1 ? "Archived" : r.ActualReturn ? "Returned" : "On loan"}</Chip></td>
+                <td>
+                  {(() => {
+                    const isArchived = Number(r.Archived) === 1;
+                    const isOverdue  = !r.ActualReturn && !isArchived && new Date(r.ExpectedBack) < new Date();
+                    const label = isArchived ? "Archived" : r.ActualReturn ? "Returned" : isOverdue ? "Overdue" : "On loan";
+                    const tone  = isArchived ? "muted" : isOverdue ? "rose" : statusTone(r.ActualReturn ? "Done" : "Rented");
+                    return <Chip tone={tone}>{label}</Chip>;
+                  })()}
+                </td>
                 <td>
                   {Number(r.Archived) === 1 ? (
                     <span

@@ -976,14 +976,15 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
       </div>
       <Frame>
         <table>
-          <thead><tr><th>Rental ID</th><th>Customer</th><th>Item</th><th>Date out</th><th>Expected back</th><th>Actual return</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Rental ID</th><th>Customer ID</th><th>Customer</th><th>Item</th><th>Date out</th><th>Expected back</th><th>Actual return</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan="8" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No rentals match your search.</td></tr>
+              <tr><td colSpan="9" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No rentals match your search.</td></tr>
             )}
             {rows.map(r => (
               <tr key={r.RentalID}>
                 <td className="mono-cell">RNT-{r.RentalID}</td>
+                <td className="mono-cell">CUS-{String(r.CustomerID).padStart(3,"0")}</td>
                 <td>{r.Customer}</td>
                 <td>{r.Item}</td>
                 <td className="mono-cell">{fmtDate(r.DateOut)}</td>

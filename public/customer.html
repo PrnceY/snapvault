@@ -990,7 +990,7 @@ function CustomerProfile({ profile, rentals, onProfileUpdated }) {
   const [selectedDeposit, setSelectedDeposit] = useState(null);
 
   const [editing, setEditing] = useState(false);
-  const [form, setForm]       = useState({ FullName: profile.FullName || '', ContactNumber: profile.ContactNumber || '', IDType: profile.IDType || '' });
+  const [form, setForm]       = useState({ FirstName: profile.FirstName || '', MiddleName: profile.MiddleName || '', LastName: profile.LastName || '', ContactNumber: profile.ContactNumber || '', IDType: profile.IDType || '' });
   const [saving, setSaving]           = useState(false);
   const [err, setErr]                 = useState(null);
   const [showIdUpload, setShowIdUpload] = useState(false);
@@ -1017,13 +1017,13 @@ function CustomerProfile({ profile, rentals, onProfileUpdated }) {
   }
 
   function startEdit() {
-    setForm({ FullName: profile.FullName || '', ContactNumber: profile.ContactNumber || '', IDType: profile.IDType || '' });
+    setForm({ FirstName: profile.FirstName || '', MiddleName: profile.MiddleName || '', LastName: profile.LastName || '', ContactNumber: profile.ContactNumber || '', IDType: profile.IDType || '' });
     setErr(null);
     setEditing(true);
   }
 
   function saveEdit() {
-    if (!form.FullName.trim()) { setErr('Full name is required.'); return; }
+    if (!form.FirstName.trim() || !form.LastName.trim()) { setErr('First and last name are required.'); return; }
     setSaving(true);
     setErr(null);
     fetch('customers.php', {
@@ -1096,8 +1096,14 @@ function CustomerProfile({ profile, rentals, onProfileUpdated }) {
           </div>
         ) : (
           <div>
-            <FormField label="Full Name">
-              <input value={form.FullName} onChange={e=>setForm({...form, FullName:e.target.value})} style={inputStyle} />
+            <FormField label="First Name">
+              <input value={form.FirstName} onChange={e=>setForm({...form, FirstName:e.target.value})} style={inputStyle} />
+            </FormField>
+            <FormField label="Middle Name (optional)">
+              <input value={form.MiddleName} onChange={e=>setForm({...form, MiddleName:e.target.value})} style={inputStyle} />
+            </FormField>
+            <FormField label="Last Name">
+              <input value={form.LastName} onChange={e=>setForm({...form, LastName:e.target.value})} style={inputStyle} />
             </FormField>
             <FormField label="Contact Number">
               <input value={form.ContactNumber} onChange={e=>setForm({...form, ContactNumber:e.target.value})} style={inputStyle} />

@@ -4,14 +4,15 @@ include 'db_connect.php';
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    $sql = "SELECT r.RentalID, c.FullName AS Customer,
+    $sql = "SELECT r.RentalID,
+               CONCAT_WS(' ', c.FirstName, NULLIF(c.MiddleName,''), c.LastName) AS Customer,
                GROUP_CONCAT(i.ItemName SEPARATOR ', ') AS Item,
                r.DateOut, r.ExpectedBack, r.ActualReturn, r.Status, r.Archived
         FROM Rentals r
         JOIN Customers c ON r.CustomerID = c.CustomerID
         JOIN Rental_Items ri ON ri.RentalID = r.RentalID
         JOIN Inventory i ON i.InventoryID = ri.InventoryID
-        GROUP BY r.RentalID, c.FullName, r.DateOut, r.ExpectedBack, r.ActualReturn, r.Status, r.Archived";
+        GROUP BY r.RentalID, c.FirstName, c.MiddleName, c.LastName, r.DateOut, r.ExpectedBack, r.ActualReturn, r.Status, r.Archived";
     $result = $conn->query($sql);
     $rows = [];
     while ($row = $result->fetch_assoc()) {

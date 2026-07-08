@@ -848,8 +848,16 @@ html, body {
           <div id="reg-error" style="display:none;background:rgba(251,113,133,0.1);border:1px solid rgba(251,113,133,0.3);color:#FB7185;font-size:12.5px;padding:9px 12px;border-radius:8px;margin-bottom:14px;"></div>
           <div id="reg-success" style="display:none;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);color:#4ADE80;font-size:12.5px;padding:9px 12px;border-radius:8px;margin-bottom:14px;"></div>
           <div style="margin-bottom:11px;">
-            <label style="display:block;font-size:11px;color:#9C97A8;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;">Full Name</label>
-            <input id="reg-name" type="text" placeholder="Juan dela Cruz" style="width:100%;background:#262430;border:1px solid #2C2A36;border-radius:8px;padding:9px 11px;color:#F3EFE6;font-size:13.5px;font-family:'Inter',sans-serif;outline:none;" />
+            <label style="display:block;font-size:11px;color:#9C97A8;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;">First Name</label>
+            <input id="reg-firstname" type="text" placeholder="Juan" style="width:100%;background:#262430;border:1px solid #2C2A36;border-radius:8px;padding:9px 11px;color:#F3EFE6;font-size:13.5px;font-family:'Inter',sans-serif;outline:none;" />
+          </div>
+          <div style="margin-bottom:11px;">
+            <label style="display:block;font-size:11px;color:#9C97A8;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;">Middle Name (optional)</label>
+            <input id="reg-middlename" type="text" placeholder="Santos" style="width:100%;background:#262430;border:1px solid #2C2A36;border-radius:8px;padding:9px 11px;color:#F3EFE6;font-size:13.5px;font-family:'Inter',sans-serif;outline:none;" />
+          </div>
+          <div style="margin-bottom:11px;">
+            <label style="display:block;font-size:11px;color:#9C97A8;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;">Last Name</label>
+            <input id="reg-lastname" type="text" placeholder="Dela Cruz" style="width:100%;background:#262430;border:1px solid #2C2A36;border-radius:8px;padding:9px 11px;color:#F3EFE6;font-size:13.5px;font-family:'Inter',sans-serif;outline:none;" />
           </div>
           <div style="margin-bottom:11px;">
             <label style="display:block;font-size:11px;color:#9C97A8;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;">Email Address</label>
@@ -998,14 +1006,16 @@ function openRegister() {
 
   function closeRegister() {
     document.getElementById('reg-overlay').style.display = 'none';
-    ['reg-name','reg-email','reg-contact','reg-pw'].forEach(id => document.getElementById(id).value = '');
+    ['reg-firstname','reg-middlename','reg-lastname','reg-email','reg-contact','reg-pw'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('reg-idtype').value = '';
     document.getElementById('reg-error').style.display = 'none';
     document.getElementById('reg-success').style.display = 'none';
   }
 
   async function submitRegister() {
-    const name    = document.getElementById('reg-name').value.trim();
+    const firstName  = document.getElementById('reg-firstname').value.trim();
+    const middleName = document.getElementById('reg-middlename').value.trim();
+    const lastName   = document.getElementById('reg-lastname').value.trim();
     const email   = document.getElementById('reg-email').value.trim();
     const contact = document.getElementById('reg-contact').value.trim();
     const idtype  = document.getElementById('reg-idtype').value;
@@ -1016,8 +1026,8 @@ function openRegister() {
     errEl.style.display = 'none';
     okEl.style.display  = 'none';
 
-    if (!name || !email || !pw) {
-      errEl.textContent = 'Full name, email, and password are required.';
+    if (!firstName || !lastName || !email || !pw) {
+      errEl.textContent = 'First name, last name, email, and password are required.';
       errEl.style.display = 'block';
       return;
     }
@@ -1045,7 +1055,7 @@ function openRegister() {
       const res  = await fetch('customers.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action:'add', FullName:name, Email:email, ContactNumber:contact, IDType:idtype, Password:pw }),
+        body: JSON.stringify({ action:'add', FirstName:firstName, MiddleName:middleName, LastName:lastName, Email:email, ContactNumber:contact, IDType:idtype, Password:pw }),
       });
       const data = await res.json();
 

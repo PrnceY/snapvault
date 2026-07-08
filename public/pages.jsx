@@ -660,7 +660,7 @@ function CustomersPage({ data }) {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ FullName:"", IDType:"School ID", ContactNumber:"" });
+  const [form, setForm] = useState({ FirstName:"", MiddleName:"", LastName:"", IDType:"School ID", ContactNumber:"" });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
   const [reviewing, setReviewing] = useState(null);
@@ -713,8 +713,8 @@ function CustomersPage({ data }) {
 
   const submit = (e) => {
     e.preventDefault();
-    if (!form.FullName) {
-      setFormError("Full name is required.");
+    if (!form.FirstName || !form.LastName) {
+      setFormError("First and last name are required.");
       return;
     }
     setSaving(true);
@@ -729,7 +729,7 @@ function CustomersPage({ data }) {
         setSaving(false);
         if (res.success) {
           setShowForm(false);
-          setForm({ FullName:"", IDType:"School ID", ContactNumber:"", Verified:false });
+          setForm({ FirstName:"", MiddleName:"", LastName:"", IDType:"School ID", ContactNumber:"" });
           refetch();
         } else {
           setFormError(res.error || "Something went wrong.");
@@ -758,15 +758,16 @@ function CustomersPage({ data }) {
       </div>
       <Frame>
         <table>
-          <thead><tr><th>Customer ID</th><th>Name</th><th>ID Type</th><th>Contact</th><th>Verification</th></tr></thead>
+          <thead><tr><th>Customer ID</th><th>First Name</th><th>Last Name</th><th>ID Type</th><th>Contact</th><th>Verification</th></tr></thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan="5" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No customers match your search.</td></tr>
+              <tr><td colSpan="6" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No customers match your search.</td></tr>
             )}
             {rows.map(c => (
               <tr key={c.CustomerID}>
                 <td className="mono-cell">CUS-{String(c.CustomerID).padStart(3,"0")}</td>
-                <td className="empty-name">{c.FullName}</td>
+                <td className="empty-name">{c.FirstName}</td>
+                <td className="empty-name">{c.LastName}</td>
                 <td>{c.IDType}</td>
                 <td className="mono-cell">{c.ContactNumber}</td>
                 <td>
@@ -787,8 +788,14 @@ function CustomersPage({ data }) {
       {showForm && (
         <Modal title="Add Customer" onClose={() => setShowForm(false)}>
           <form onSubmit={submit}>
-            <FormField label="Full Name">
-              <input style={inputStyle} value={form.FullName} onChange={e => setForm({...form, FullName:e.target.value})} placeholder="e.g. Juan Dela Cruz" />
+            <FormField label="First Name">
+              <input style={inputStyle} value={form.FirstName} onChange={e => setForm({...form, FirstName:e.target.value})} placeholder="e.g. Juan" />
+            </FormField>
+            <FormField label="Middle Name (optional)">
+              <input style={inputStyle} value={form.MiddleName} onChange={e => setForm({...form, MiddleName:e.target.value})} placeholder="e.g. Santos" />
+            </FormField>
+            <FormField label="Last Name">
+              <input style={inputStyle} value={form.LastName} onChange={e => setForm({...form, LastName:e.target.value})} placeholder="e.g. Dela Cruz" />
             </FormField>
             <FormField label="ID Type">
               <select style={inputStyle} value={form.IDType} onChange={e => setForm({...form, IDType:e.target.value})}>

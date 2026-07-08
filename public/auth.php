@@ -14,7 +14,7 @@ if (!$email || !$password) {
 }
 
 if ($loginAs === 'customer') {
-    $stmt = $conn->prepare("SELECT CustomerID, FullName, PasswordHash FROM Customers WHERE Email = ?");
+    $stmt = $conn->prepare("SELECT CustomerID, CONCAT_WS(' ', FirstName, NULLIF(MiddleName,''), LastName) AS FullName, PasswordHash FROM Customers WHERE Email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $customer = $stmt->get_result()->fetch_assoc();

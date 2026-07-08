@@ -5,7 +5,10 @@ include 'db_connect.php';
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    $sql = "SELECT CustomerID, FullName, IDType, ContactNumber, IDImagePath, VerificationStatus FROM Customers";
+    $sql = "SELECT CustomerID, FirstName, MiddleName, LastName,
+               CONCAT_WS(' ', FirstName, NULLIF(MiddleName,''), LastName) AS FullName,
+               IDType, ContactNumber, IDImagePath, VerificationStatus
+        FROM Customers";
     $result = $conn->query($sql);
     $rows = [];
     while ($row = $result->fetch_assoc()) {
@@ -24,17 +27,25 @@ if (!$action) {
 }
 
 if ($action === 'add') {
-    if (!$data || !isset($data['FullName'], $data['Email'], $data['Password'])) {
+    if (!$data || !isset($data['FirstName'], $data['LastName'], $data['Email'], $data['Password'])) {
         http_response_code(400);
         echo json_encode(["success" => false, "error" => "Missing required fields."]);
         exit;
     }
 
-    $fullName = trim($data['FullName']);
-    $idType   = $data['IDType'] ?? '';
-    $contact  = $data['ContactNumber'] ?? '';
-    $email    = trim($data['Email']);
-    $hash     = password_hash($data['Password'], PASSWORD_DEFAULT);
+    $firstName  = trim($data['FirstName']);
+    $middleName = trim($data['MiddleName'] ?? '');
+    $lastName   = trim($data['LastName']);
+    $idType     = $data['IDType'] ?? '';
+    $contact    = $data['ContactNumber'] ?? '';
+    $email      = trim($data['Email']);
+    $hash       = password_hash($data['Password'], PASSWORD_DEFAULT);
+
+    if (!$firstName || !$lastName) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "error" => "First name and last name are required."]);
+        exit;
+    }
 
     // Check if email already in use
     $chk = $conn->prepare("SELECT CustomerID FROM Customers WHERE Email = ?");
@@ -52,8 +63,8 @@ if ($action === 'add') {
 
     $conn->begin_transaction();
     try {
-        $s1 = $conn->prepare("INSERT INTO Customers (ShopID, FullName, IDType, ContactNumber, Email, PasswordHash) VALUES ((SELECT ShopID FROM Shop LIMIT 1), ?, ?, ?, ?, ?)");
-        $s1->bind_param("sssss", $fullName, $idType, $contact, $email, $hash);
+        $s1 = $conn->prepare("INSERT INTO Customers (ShopID, FirstName, MiddleName, LastName, IDType, ContactNumber, Email, PasswordHash) VALUES ((SELECT ShopID FROM Shop LIMIT 1), ?, ?, ?, ?, ?, ?, ?)");
+        $s1->bind_param("sssssss", $firstName, $middleName, $lastName, $idType, $contact, $email, $hash);
         $s1->execute();
         $customerId = $conn->insert_id;
         $s1->close();
@@ -78,19 +89,21 @@ if ($action === 'edit') {
     }
 
     $customerId = (int)$_SESSION['customerID'];
-    $fullName   = trim($data['FullName'] ?? '');
+    $firstName  = trim($data['FirstName'] ?? '');
+    $middleName = trim($data['MiddleName'] ?? '');
+    $lastName   = trim($data['LastName'] ?? '');
     $idType     = $data['IDType'] ?? '';
     $contact    = trim($data['ContactNumber'] ?? '');
 
-    if (!$fullName) {
+    if (!$firstName || !$lastName) {
         http_response_code(400);
-        echo json_encode(["success" => false, "error" => "Full name is required."]);
+        echo json_encode(["success" => false, "error" => "First name and last name are required."]);
         $conn->close();
         exit;
     }
 
-    $stmt = $conn->prepare("UPDATE Customers SET FullName = ?, IDType = ?, ContactNumber = ? WHERE CustomerID = ?");
-    $stmt->bind_param("sssi", $fullName, $idType, $contact, $customerId);
+    $stmt = $conn->prepare("UPDATE Customers SET FirstName = ?, MiddleName = ?, LastName = ?, IDType = ?, ContactNumber = ? WHERE CustomerID = ?");
+    $stmt->bind_param("sssssi", $firstName, $middleName, $lastName, $idType, $contact, $customerId);
     $stmt->execute()
         ? print(json_encode(["success" => true]))
         : (http_response_code(500) && print(json_encode(["success" => false, "error" => $stmt->error])));

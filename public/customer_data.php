@@ -11,7 +11,10 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'customer') {
 $customerID = (int)$_SESSION['customerID'];
 
 // Customer profile
-$stmt = $conn->prepare("SELECT CustomerID, FullName, IDType, ContactNumber, IDImagePath, VerificationStatus FROM Customers WHERE CustomerID = ?");
+$stmt = $conn->prepare("SELECT CustomerID, FirstName, MiddleName, LastName,
+                                CONCAT_WS(' ', FirstName, NULLIF(MiddleName,''), LastName) AS FullName,
+                                IDType, ContactNumber, IDImagePath, VerificationStatus
+                         FROM Customers WHERE CustomerID = ?");
 $stmt->bind_param("i", $customerID);
 $stmt->execute();
 $customer = $stmt->get_result()->fetch_assoc();

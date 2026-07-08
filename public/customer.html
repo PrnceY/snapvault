@@ -717,9 +717,20 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onCons
   const totalDeposit = totalRate * 2;
   const totalCost    = totalRate * days;
 
+  const [limitMsg, setLimitMsg] = useState(null);
+
   function toggleCart(item) {
+    const already = cart.find(i => i.SerialNumber === item.SerialNumber);
+    if (!already) {
+      const catCount = cart.filter(i => i.CategoryName === item.CategoryName).length;
+      if (catCount >= 3) {
+        setLimitMsg(`You've hit the 3-item limit for ${item.CategoryName}. Deselect one to add another.`);
+        return;
+      }
+    }
+    setLimitMsg(null);
     setCart(prev =>
-      prev.find(i => i.SerialNumber === item.SerialNumber)
+      already
         ? prev.filter(i => i.SerialNumber !== item.SerialNumber)
         : [...prev, item]
     );
@@ -791,11 +802,11 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onCons
         {step === 1 && (
           <>
             <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:17,marginBottom:4}}>Select Equipment</div>
-            <div style={{fontSize:13,color:'var(--muted)',marginBottom:18}}>
+            <div style={{fontSize:13,color:'var(--muted)',marginBottom:6}}>
               {selCat ? (
                 <span>
                   <span
-                    onClick={() => { setSelCat(null); setCart([]); }}
+                    onClick={() => setSelCat(null)}
                     style={{color:'var(--amber)',cursor:'pointer',fontWeight:500}}
                   >
                     All Categories
@@ -803,6 +814,9 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onCons
                   {' › '}{selCat}
                 </span>
               ) : 'Pick a category to browse available gear.'}
+            </div>
+            <div style={{fontSize:11.5,color:'var(--muted)',marginBottom:18}}>
+              You can pick equipment from multiple categories — up to 3 items per category.
             </div>
 
             {/* Category cards */}
@@ -830,6 +844,11 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onCons
             {/* Item list within selected category */}
             {selCat && (
               <>
+                {limitMsg && (
+                  <div style={{background:'rgba(251,113,133,0.1)',border:'1px solid rgba(251,113,133,0.3)',borderRadius:8,padding:'9px 12px',marginBottom:12,fontSize:12.5,color:'var(--rose)'}}>
+                    {limitMsg}
+                  </div>
+                )}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
                   {catItems.slice((itemPage-1)*ITEMS_PER_PAGE, itemPage*ITEMS_PER_PAGE).map(item => {
                     const selected = inCart(item);

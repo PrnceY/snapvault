@@ -1355,8 +1355,9 @@ function CompatibilityPage({ data }) {
 }
 
 function ReportsPage({ data }) {
-  const { rentals, customers, inventory } = data;
+  const { rentals, customers, inventory, categories } = data;
   const returned = rentals.filter(r => !!r.ActualReturn);
+  const [showAllCustomers, setShowAllCustomers] = useState(false);
 
   // Revenue: sum of deposits for returned rentals (approximation from deposits via rental join)
   // We'll count rental days × use deposit as proxy since we don't have RentalRate in the data
@@ -1371,18 +1372,55 @@ function ReportsPage({ data }) {
   const rentedNow    = inventory.filter(i => i.Status === "Rented").length;
   const utilization  = totalUnits === 0 ? 0 : Math.round((rentedNow / totalUnits) * 100);
 
-  // Top rented items
-  const itemCounts = {};
-  rentals.forEach(r => { itemCounts[r.Item] = (itemCounts[r.Item] || 0) + 1; });
-  const topItems = Object.entries(itemCounts).sort((a,b) => b[1]-a[1]).slice(0,5);
+  // Top rented items, split per-item (a rental can carry multiple items) and mapped to their category
+  const itemCategory = {};
+  inventory.forEach(i => { itemCategory[i.ItemName] = i.CategoryName; });
 
-  // Customer activity
+  const itemCounts = {};
+  rentals.forEach(r => {
+    r.Item.split(", ").forEach(name => {
+      itemCounts[name] = (itemCounts[name] || 0) + 1;
+    });
+  });
+
+  // Top 3 items per category, driven live by the Equipment_Categories table
+  const categoryTopItems = categories.map(cat => ({
+    category: cat.CategoryName,
+    items: Object.entries(itemCounts)
+      .filter(([name]) => itemCategory[name] === cat.CategoryName)
+      .sort((a,b) => b[1]-a[1])
+      .slice(0,3),
+  }));
+
+  // Customer activity, latest 4 shown, full list available via "View All"
   const custCounts = {};
   rentals.forEach(r => { custCounts[r.Customer] = (custCounts[r.Customer] || 0) + 1; });
-  const topCustomers = Object.entries(custCounts).sort((a,b) => b[1]-a[1]).slice(0,6);
+  const topCustomers = Object.entries(custCounts).sort((a,b) => b[1]-a[1]);
+  const recentCustomers = topCustomers.slice(0,7);
 
   function getInitials(name) {
     return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  }
+
+  function CustomerRow([name, count]) {
+    const cust = customers.find(c => c.FullName === name);
+    return (
+      <div key={name} style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14}}>
+        <div style={{display:"flex", alignItems:"center", gap:10}}>
+          <div style={{width:34,height:34,borderRadius:"50%",background:"var(--amber)",color:"#1A1320",fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {getInitials(name)}
+          </div>
+          <div>
+            <div style={{fontSize:13,fontWeight:600}}>{name}</div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>C-{String(cust?.CustomerID||'').padStart(3,'0')}</div>
+          </div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:12,fontFamily:"'IBM Plex Mono',monospace",color:"var(--amber)",fontWeight:600}}>{count} rentals</div>
+          <Chip tone={cust?.VerificationStatus === "Verified" ? "green" : "amber"} style={{marginTop:2}}>{cust?.VerificationStatus === "Verified" ? "Active" : "Pending"}</Chip>
+        </div>
+      </div>
+    );
   }
 
   const panelStyle = { background:"var(--card)", border:"1px solid var(--line)", borderRadius:14, padding:"20px 22px", flex:1, minWidth:0 };
@@ -1412,43 +1450,43 @@ function ReportsPage({ data }) {
       <div style={{display:"flex", gap:14, flexWrap:"wrap"}}>
         <div style={panelStyle}>
           <div style={{fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:15, marginBottom:18}}>Top Rented Equipment</div>
-          {topItems.length === 0 && <span style={{fontSize:13,color:"var(--muted)"}}>No data yet.</span>}
-          {topItems.map(([item, count], i) => (
-            <div key={item} style={{display:"flex", justifyContent:"space-between", alignItems:"center", paddingBottom:14, marginBottom:14, borderBottom:"1px solid var(--line)"}}>
-              <div style={{display:"flex", alignItems:"center", gap:12}}>
-                <span style={{fontFamily:"'IBM Plex Mono',monospace", fontSize:11, color:"var(--muted)", width:20}}>#{i+1}</span>
-                <span style={{fontSize:13}}>{item}</span>
-              </div>
-              <span style={{fontFamily:"'IBM Plex Mono',monospace", fontSize:12, color:"var(--amber)"}}>{count} rentals</span>
+          {categoryTopItems.length === 0 && <span style={{fontSize:13,color:"var(--muted)"}}>No data yet.</span>}
+          {categoryTopItems.map((cat, ci) => (
+            <div key={cat.category} style={{marginBottom: ci === categoryTopItems.length-1 ? 0 : 18}}>
+              <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'IBM Plex Mono',monospace",letterSpacing:0.5,textTransform:"uppercase",marginBottom:10}}>{cat.category}</div>
+              {cat.items.length === 0 && <span style={{fontSize:12.5,color:"var(--muted)"}}>No rentals yet.</span>}
+              {cat.items.map(([item, count], i) => (
+                <div key={item} style={{display:"flex", justifyContent:"space-between", alignItems:"center", paddingBottom:10, marginBottom:10, borderBottom:"1px solid var(--line)"}}>
+                  <div style={{display:"flex", alignItems:"center", gap:12}}>
+                    <span style={{fontFamily:"'IBM Plex Mono',monospace", fontSize:11, color:"var(--muted)", width:20}}>#{i+1}</span>
+                    <span style={{fontSize:13}}>{item}</span>
+                  </div>
+                  <span style={{fontFamily:"'IBM Plex Mono',monospace", fontSize:12, color:"var(--amber)"}}>{count} rentals</span>
+                </div>
+              ))}
             </div>
           ))}
         </div>
 
         <div style={panelStyle}>
-          <div style={{fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:15, marginBottom:18}}>Customer Activity</div>
-          {topCustomers.length === 0 && <span style={{fontSize:13,color:"var(--muted)"}}>No data yet.</span>}
-          {topCustomers.map(([name, count]) => {
-            const cust = customers.find(c => c.FullName === name);
-            return (
-              <div key={name} style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14}}>
-                <div style={{display:"flex", alignItems:"center", gap:10}}>
-                  <div style={{width:34,height:34,borderRadius:"50%",background:"var(--amber)",color:"#1A1320",fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    {getInitials(name)}
-                  </div>
-                  <div>
-                    <div style={{fontSize:13,fontWeight:600}}>{name}</div>
-                    <div style={{fontSize:11,color:"var(--muted)"}}>C-{String(cust?.CustomerID||'').padStart(3,'0')}</div>
-                  </div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:12,fontFamily:"'IBM Plex Mono',monospace",color:"var(--amber)",fontWeight:600}}>{count} rentals</div>
-                  <Chip tone={cust?.VerificationStatus === "Verified" ? "green" : "amber"} style={{marginTop:2}}>{cust?.VerificationStatus === "Verified" ? "Active" : "Pending"}</Chip>
-                </div>
-              </div>
-            );
-          })}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:15}}>Customer Activity</div>
+            {topCustomers.length > 7 && (
+              <span style={{fontSize:11.5,color:"var(--amber)",cursor:"pointer",fontWeight:600}} onClick={() => setShowAllCustomers(true)}>View All</span>
+            )}
+          </div>
+          {recentCustomers.length === 0 && <span style={{fontSize:13,color:"var(--muted)"}}>No data yet.</span>}
+          {recentCustomers.map(CustomerRow)}
         </div>
       </div>
+
+      {showAllCustomers && (
+        <Modal title="All Customer Activity" onClose={() => setShowAllCustomers(false)} width={420}>
+          <div style={{maxHeight:420,overflowY:"auto"}}>
+            {topCustomers.map(CustomerRow)}
+          </div>
+        </Modal>
+      )}
     </>
   );
 }

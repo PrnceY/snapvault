@@ -105,6 +105,56 @@ function CustomerApp() {
     return diff >= 0 && diff <= 7;
   });
 
+  // Build a persistent notification feed from rental/deposit state, newest first.
+  // Unlike a live filter over activeRentals, this keeps a record for every
+  // rental regardless of whether it has since been marked returned.
+  function notifTone(status) {
+    if (status === 'Full Refund') return 'blue';
+    if (status === 'Partial Refund') return 'amber';
+    if (status === 'Forfeited') return 'rose';
+    return 'muted';
+  }
+  function notifLabel(r) {
+    const amt = parseFloat(r.AmountHeld || 0).toLocaleString();
+    if (r.RefundStatus === 'Full Refund')   return `Deposit ₱${amt} refunded for completed rental #${r.RentalID}`;
+    if (r.RefundStatus === 'Partial Refund') return `Partial deposit ₱${amt} refunded for rental #${r.RentalID}`;
+    if (r.RefundStatus === 'Forfeited')      return `Deposit ₱${amt} forfeited for rental #${r.RentalID}`;
+    return `Rental #${r.RentalID} returned — deposit review pending`;
+  }
+
+  const allNotifications = rentals.flatMap(r => {
+    const items = [];
+    if (!r.ActualReturn) {
+      items.push({
+        id: 'active-'+r.RentalID, tone: 'green', date: new Date(r.DateOut),
+        text: `Rental #${r.RentalID} active — ${r.Item} currently out`,
+        time: `Due back: ${fmtDate(r.ExpectedBack)}`,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+      });
+      const due = new Date(r.ExpectedBack);
+      const diff = (due - now) / 86400000;
+      if (diff >= 0 && diff <= 7) {
+        items.push({
+          id: 'due-'+r.RentalID, tone: 'amber', date: due,
+          text: `Return reminder: ${r.Item} is due back on ${due.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`,
+          time: fmtDate(r.ExpectedBack),
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+        });
+      }
+    } else {
+      items.push({
+        id: 'ret-'+r.RentalID, tone: notifTone(r.RefundStatus), date: new Date(r.ActualReturn),
+        text: notifLabel(r),
+        time: fmtDate(r.ActualReturn),
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>,
+      });
+    }
+    return items;
+  }).sort((a,b) => b.date - a.date);
+
+  const [showAllNotifs, setShowAllNotifs] = useState(false);
+  const [showAllRentals, setShowAllRentals] = useState(false);
+
   const initials   = getInitials(profile?.FullName);
   const today      = now.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
   const firstName  = profile?.FullName?.split(' ')[0] || 'there';
@@ -233,55 +283,59 @@ function CustomerApp() {
 
               {/* Notifications */}
               <div style={{marginBottom:22}}>
-                <div className="section-head"><h2>Notifications</h2></div>
+                <div className="section-head">
+                  <h2>Notifications</h2>
+                  {allNotifications.length > 5 && (
+                    <span onClick={() => setShowAllNotifs(true)} style={{fontSize:12,color:'var(--amber)',cursor:'pointer',fontWeight:600}}>View All</span>
+                  )}
+                </div>
                 <Frame>
                   <div className="notif-list">
-                    {activeRentals.length === 0 && rentals.length === 0 ? (
+                    {allNotifications.length === 0 ? (
                       <div className="notif-item"><span style={{color:'var(--muted)',fontSize:13}}>No recent notifications.</span></div>
                     ) : (
-                      <>
-                        {activeRentals.slice(0,2).map(r => (
-                          <div className="notif-item" key={r.RentalID}>
-                            <div className="notif-icon green">
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                            </div>
-                            <div>
-                              <div className="notif-text">Rental #{r.RentalID} active — {r.Item} currently out</div>
-                              <div className="notif-time">Due back: {fmtDate(r.ExpectedBack)}</div>
-                            </div>
+                      allNotifications.slice(0,5).map(n => (
+                        <div className="notif-item" key={n.id}>
+                          <div className={`notif-icon ${n.tone}`}>{n.icon}</div>
+                          <div>
+                            <div className="notif-text">{n.text}</div>
+                            <div className="notif-time">{n.time}</div>
                           </div>
-                        ))}
-                        {upcomingReturns.map(r => (
-                          <div className="notif-item" key={'due-'+r.RentalID}>
-                            <div className="notif-icon amber">
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                            </div>
-                            <div>
-                              <div className="notif-text">Return reminder: {r.Item} is due back on {new Date(r.ExpectedBack).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
-                              <div className="notif-time">{fmtDate(r.ExpectedBack)}</div>
-                            </div>
-                          </div>
-                        ))}
-                        {rentals.filter(r => r.ActualReturn && r.RefundStatus === 'Full Refund').slice(0,1).map(r => (
-                          <div className="notif-item" key={'ref-'+r.RentalID}>
-                            <div className="notif-icon blue">
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>
-                            </div>
-                            <div>
-                              <div className="notif-text">Deposit ₱{parseFloat(r.AmountHeld||0).toLocaleString()} refunded for completed rental #{r.RentalID}</div>
-                              <div className="notif-time">{fmtDate(r.ActualReturn)}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </>
+                        </div>
+                      ))
                     )}
                   </div>
                 </Frame>
               </div>
 
+              {showAllNotifs && (
+                <Modal title="All Notifications" onClose={() => setShowAllNotifs(false)} width={480}>
+                  <div className="notif-list" style={{maxHeight:420,overflowY:'auto'}}>
+                    {allNotifications.length === 0 ? (
+                      <div className="notif-item"><span style={{color:'var(--muted)',fontSize:13}}>No notifications yet.</span></div>
+                    ) : (
+                      allNotifications.map(n => (
+                        <div className="notif-item" key={n.id}>
+                          <div className={`notif-icon ${n.tone}`}>{n.icon}</div>
+                          <div>
+                            <div className="notif-text">{n.text}</div>
+                            <div className="notif-time">{n.time}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </Modal>
+              )}
+
               {/* Recent Rental Activity */}
               <div>
-                <div className="section-head"><h2>Recent Rental Activity</h2></div>
+                <div className="section-head">
+                  <h2>Recent Rental Activity</h2>
+                  {rentals.length > 5 && (
+                    <span onClick={() => setShowAllRentals(true)} style={{fontSize:12,color:'var(--amber)',cursor:'pointer',fontWeight:600}}>View All</span>
+                  )}
+                </div>
                 <Frame>
                   <table>
                     <thead>
@@ -314,6 +368,39 @@ function CustomerApp() {
                   </table>
                 </Frame>
               </div>
+
+              {showAllRentals && (
+                <Modal title="All Rental Activity" onClose={() => setShowAllRentals(false)} width={640}>
+                  <div style={{maxHeight:420,overflowY:'auto'}}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Rental ID</th>
+                          <th>Equipment</th>
+                          <th>Rental Date</th>
+                          <th>Return Date</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rentals.map(r => {
+                          const status = r.ActualReturn ? 'Returned' : (new Date(r.ExpectedBack) < now ? 'Overdue' : 'Active');
+                          const tone   = status==='Active'?'green':status==='Overdue'?'rose':'muted';
+                          return (
+                            <tr key={r.RentalID}>
+                              <td><span style={{color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12}}>RNT-{r.RentalID}</span></td>
+                              <td>{r.Item}</td>
+                              <td className="mono-cell">{fmtDate(r.DateOut)}</td>
+                              <td className="mono-cell">{fmtDate(r.ExpectedBack)}</td>
+                              <td><Chip tone={tone}>{status}</Chip></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Modal>
+              )}
             </>
           )}
 

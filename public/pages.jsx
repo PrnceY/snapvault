@@ -658,6 +658,7 @@ function InventoryPage({ data, categoryFilter, setCategoryFilter }) {
 function CustomersPage({ data }) {
   const { customers, refetch } = data;
   const [filter, setFilter] = useState("All");
+  const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ FullName:"", IDType:"School ID", ContactNumber:"" });
   const [saving, setSaving] = useState(false);
@@ -668,9 +669,12 @@ function CustomersPage({ data }) {
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmReject, setConfirmReject] = useState(false);
   const filters = ["All","Verified","Pending","Unverified"];
+  const q = search.trim().toLowerCase();
   const rows = customers.filter(c => {
-    if (filter === "All") return true;
-    return (c.VerificationStatus || "Unverified") === filter;
+    if (filter !== "All" && (c.VerificationStatus || "Unverified") !== filter) return false;
+    if (!q) return true;
+    const idStr = `cus-${String(c.CustomerID).padStart(3,"0")}`;
+    return c.FullName.toLowerCase().includes(q) || idStr.includes(q) || String(c.CustomerID).includes(q);
   });
 
   function approveId() {
@@ -737,10 +741,16 @@ function CustomersPage({ data }) {
   return (
     <>
       <div className="pill-row" style={{justifyContent:"space-between", display:"flex", flexWrap:"wrap", gap:10}}>
-        <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+        <div style={{display:"flex", gap:8, flexWrap:"wrap", alignItems:"center"}}>
           {filters.map(f => (
             <div key={f} className={`pill ${filter===f ? "on":""}`} onClick={() => setFilter(f)}>{f}</div>
           ))}
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name or customer ID…"
+            style={{...inputStyle, width:220, padding:"7px 12px", fontSize:12.5}}
+          />
         </div>
         <div className="pill" style={{background:"var(--amber)", color:"#1A1320", borderColor:"var(--amber)", fontWeight:600}} onClick={() => setShowForm(true)}>
           + Add Customer
@@ -750,6 +760,9 @@ function CustomersPage({ data }) {
         <table>
           <thead><tr><th>Customer ID</th><th>Name</th><th>ID Type</th><th>Contact</th><th>Verification</th></tr></thead>
           <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan="5" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No customers match your search.</td></tr>
+            )}
             {rows.map(c => (
               <tr key={c.CustomerID}>
                 <td className="mono-cell">CUS-{String(c.CustomerID).padStart(3,"0")}</td>

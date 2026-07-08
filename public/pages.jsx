@@ -1153,6 +1153,49 @@ function DepositsPage({ data }) {
           </tbody>
         </table>
       </Frame>
+
+      {totalPages > 1 && (
+        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:14, padding:"0 4px"}}>
+          <span style={{fontSize:12, color:"var(--muted)", fontFamily:"'IBM Plex Mono',monospace"}}>
+            {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} logs
+          </span>
+          <div style={{display:"flex", gap:6}}>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+              style={{padding:"6px 13px", borderRadius:8, border:"1px solid var(--line)", background:"var(--card)", color: safePage === 1 ? "var(--muted)" : "var(--text)", cursor: safePage === 1 ? "default" : "pointer", fontSize:12, fontFamily:"'Inter',sans-serif"}}
+            >
+              ← Prev
+            </button>
+            {Array.from({length: totalPages}, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+              .reduce((acc, p, idx, arr) => {
+                if (idx > 0 && p - arr[idx - 1] > 1) acc.push("...");
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, idx) => p === "..." ? (
+                <span key={`ellipsis-${idx}`} style={{padding:"6px 4px", color:"var(--muted)", fontSize:12}}>…</span>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => setCurrentPage(p)}
+                  style={{padding:"6px 11px", borderRadius:8, border:"1px solid", borderColor: p === safePage ? "var(--amber)" : "var(--line)", background: p === safePage ? "var(--amber)" : "var(--card)", color: p === safePage ? "#1A1320" : "var(--text)", cursor:"pointer", fontSize:12, fontWeight: p === safePage ? 600 : 400, fontFamily:"'Inter',sans-serif"}}
+                >
+                  {p}
+                </button>
+              ))
+            }
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              style={{padding:"6px 13px", borderRadius:8, border:"1px solid var(--line)", background:"var(--card)", color: safePage === totalPages ? "var(--muted)" : "var(--text)", cursor: safePage === totalPages ? "default" : "pointer", fontSize:12, fontFamily:"'Inter',sans-serif"}}
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -1494,6 +1537,10 @@ function ReportsPage({ data }) {
 function AuditLogsPage({ data }) {
   const { rentals, inventory, customers } = data;
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 15;
+
+  useEffect(() => { setCurrentPage(1); }, [search]);
 
   // Build synthetic audit log from real data
   const logs = [];
@@ -1533,6 +1580,32 @@ function AuditLogsPage({ data }) {
     !search || l.action.toLowerCase().includes(search.toLowerCase()) || l.detail.toLowerCase().includes(search.toLowerCase())
   );
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  function exportCsv() {
+    const headers = ["#", "Action", "Detail", "Timestamp", "Type"];
+    const escape = (val) => `"${String(val).replace(/"/g, '""')}"`;
+    const rows = filtered.map((l, i) => [
+      filtered.length - i,
+      l.action,
+      l.detail,
+      l.date ? new Date(l.date).toLocaleString("en-US",{month:"short",day:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—",
+      l.type,
+    ]);
+    const csv = [headers, ...rows].map(row => row.map(escape).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `snapvault-audit-logs-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18, gap:12}}>
@@ -1544,7 +1617,7 @@ function AuditLogsPage({ data }) {
             style={{...inputStyle, paddingLeft:36}}
           />
         </div>
-        <div className="pill" style={{background:"none", border:"1px solid var(--amber)", color:"var(--amber)", fontWeight:600, cursor:"default", display:"flex", alignItems:"center", gap:6}}>
+        <div className="pill" style={{background:"none", border:"1px solid var(--amber)", color:"var(--amber)", fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:6}} onClick={exportCsv}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export Logs
         </div>
@@ -1561,14 +1634,15 @@ function AuditLogsPage({ data }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
+            {pageRows.length === 0 && (
               <tr><td colSpan="5" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No logs found.</td></tr>
             )}
-            {filtered.map((l, i) => {
+            {pageRows.map((l, i) => {
               const meta = typeMeta[l.type] || typeMeta.inventory;
+              const rowIndex = (safePage - 1) * PAGE_SIZE + i;
               return (
-                <tr key={i}>
-                  <td className="mono-cell">{String(i+1).padStart(4,"0")}</td>
+                <tr key={rowIndex}>
+                  <td className="mono-cell">{String(filtered.length - rowIndex).padStart(4,"0")}</td>
                   <td style={{fontWeight:600, fontSize:13}}>{l.action}</td>
                   <td style={{fontSize:13, color:"var(--muted)"}}>{l.detail}</td>
                   <td className="mono-cell" style={{whiteSpace:"nowrap"}}>
@@ -1585,6 +1659,83 @@ function AuditLogsPage({ data }) {
           </tbody>
         </table>
       </Frame>
+
+      {totalPages > 1 && (
+        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:14, padding:"0 4px"}}>
+          <span style={{fontSize:12, color:"var(--muted)", fontFamily:"'IBM Plex Mono',monospace"}}>
+            {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} logs
+          </span>
+          <div style={{display:"flex", gap:6}}>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+              style={{
+                padding:"6px 13px",
+                borderRadius:8,
+                border:"1px solid var(--line)",
+                background:"var(--card)",
+                color: safePage === 1 ? "var(--muted)" : "var(--text)",
+                cursor: safePage === 1 ? "default" : "pointer",
+                fontSize:12,
+                fontFamily:"'Inter',sans-serif",
+              }}
+            >
+              ← Prev
+            </button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+              .reduce((acc, p, idx, arr) => {
+                if (idx > 0 && p - arr[idx - 1] > 1) acc.push("...");
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, idx) =>
+                p === "..." ? (
+                  <span key={`ellipsis-${idx}`} style={{ padding:"6px 4px", color:"var(--muted)", fontSize:12 }}>
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentPage(p)}
+                    style={{
+                      padding:"6px 11px",
+                      borderRadius:8,
+                      border:"1px solid",
+                      borderColor: p === safePage ? "var(--amber)" : "var(--line)",
+                      background: p === safePage ? "var(--amber)" : "var(--card)",
+                      color: p === safePage ? "#1A1320" : "var(--text)",
+                      cursor:"pointer",
+                      fontSize:12,
+                      fontWeight: p === safePage ? 600 : 400,
+                      fontFamily:"'Inter',sans-serif",
+                    }}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              style={{
+                padding:"6px 13px",
+                borderRadius:8,
+                border:"1px solid var(--line)",
+                background:"var(--card)",
+                color: safePage === totalPages ? "var(--muted)" : "var(--text)",
+                cursor: safePage === totalPages ? "default" : "pointer",
+                fontSize:12,
+                fontFamily:"'Inter',sans-serif",
+              }}
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

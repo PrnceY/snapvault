@@ -21,6 +21,7 @@ $stmt->close();
 $stmt = $conn->prepare("
     SELECT r.RentalID,
            GROUP_CONCAT(i.ItemName SEPARATOR ', ') AS Item,
+           GROUP_CONCAT(i.SerialNumber SEPARATOR ', ') AS Serials,
            r.DateOut, r.ExpectedBack, r.ActualReturn,
            d.DepositID, d.AmountHeld, d.RefundStatus
     FROM Rentals r

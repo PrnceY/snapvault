@@ -1401,6 +1401,7 @@ function ReportsPage({ data }) {
   const { rentals, customers, inventory, categories } = data;
   const returned = rentals.filter(r => !!r.ActualReturn);
   const [showAllCustomers, setShowAllCustomers] = useState(false);
+  const [selectedKpi, setSelectedKpi] = useState(null);
 
   // Revenue: sum of deposits for returned rentals (approximation from deposits via rental join)
   // We'll count rental days × use deposit as proxy since we don't have RentalRate in the data
@@ -1468,21 +1469,54 @@ function ReportsPage({ data }) {
 
   const panelStyle = { background:"var(--card)", border:"1px solid var(--line)", borderRadius:14, padding:"20px 22px", flex:1, minWidth:0 };
 
+  const kpiInfo = {
+    rentals: {
+      title: "Total Rentals",
+      value: `${totalRentals}`,
+      meaning: "Every rental your shop has ever logged — whether it's currently out, already returned, or filed away as an old record.",
+      calculation: "A simple running count of all rentals on file.",
+      notes: [
+        "This is a lifetime total, so it only grows as you rent out more gear — it's not a current snapshot.",
+        "Older rentals you've filed away are still included, since they're part of your shop's full rental history.",
+      ],
+    },
+    duration: {
+      title: "Avg Rental Duration",
+      value: `${avgDuration} days`,
+      meaning: "On average, how many days customers hold onto equipment before bringing it back.",
+      calculation: "We take every rental that's already been returned, count the days each one was out, then average those together.",
+      notes: [
+        `This is based on ${returned.length} completed rental${returned.length === 1 ? "" : "s"} so far.`,
+        "Rentals that are still out or running late aren't factored in yet — only ones customers have actually returned.",
+      ],
+    },
+    utilization: {
+      title: "Equipment Utilization",
+      value: `${utilization}%`,
+      meaning: "The share of your active gear that's out on rental right now, versus sitting on the shelf.",
+      calculation: "The number of items currently rented out, divided by all the active equipment in your catalog.",
+      notes: [
+        `Right now, ${rentedNow} of ${totalUnits} active item${totalUnits === 1 ? "" : "s"} ${totalUnits === 1 ? "is" : "are"} out on rental.`,
+        "A higher percentage means more of your inventory is earning money instead of sitting idle. Retired or filed-away equipment isn't counted, since it's no longer available to rent.",
+      ],
+    },
+  };
+
   return (
     <>
       {/* KPI row */}
       <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14, marginBottom:20}}>
-        <div className="stat-card">
+        <div className="stat-card clickable" onClick={() => setSelectedKpi("rentals")}>
           <div className="lab" style={{fontSize:12,color:"var(--muted)",marginBottom:10}}>Total Rentals</div>
           <div className="num" style={{fontSize:28}}>{totalRentals}</div>
           <div className="lab">All time</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card clickable" onClick={() => setSelectedKpi("duration")}>
           <div className="lab" style={{fontSize:12,color:"var(--muted)",marginBottom:10}}>Avg Rental Duration</div>
           <div className="num" style={{fontSize:28}}>{avgDuration} <span style={{fontSize:16,fontWeight:400}}>days</span></div>
           <div className="lab">Per rental</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card clickable" onClick={() => setSelectedKpi("utilization")}>
           <div className="lab" style={{fontSize:12,color:"var(--muted)",marginBottom:10}}>Equipment Utilization</div>
           <div className="num" style={{fontSize:28}}>{utilization}<span style={{fontSize:16,fontWeight:400}}>%</span></div>
           <div className="lab">Currently rented out</div>
@@ -1527,6 +1561,28 @@ function ReportsPage({ data }) {
         <Modal title="All Customer Activity" onClose={() => setShowAllCustomers(false)} width={420}>
           <div style={{maxHeight:420,overflowY:"auto"}}>
             {topCustomers.map(CustomerRow)}
+          </div>
+        </Modal>
+      )}
+
+      {selectedKpi && (
+        <Modal title={kpiInfo[selectedKpi].title} onClose={() => setSelectedKpi(null)} width={420}>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif", fontWeight:700, fontSize:26, marginBottom:16}}>
+            {kpiInfo[selectedKpi].value}
+          </div>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'IBM Plex Mono',monospace",letterSpacing:0.5,textTransform:"uppercase",marginBottom:5}}>What This Means</div>
+            <div style={{fontSize:13, color:"var(--text)", lineHeight:1.6}}>{kpiInfo[selectedKpi].meaning}</div>
+          </div>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'IBM Plex Mono',monospace",letterSpacing:0.5,textTransform:"uppercase",marginBottom:5}}>How We Calculate It</div>
+            <div style={{fontSize:13, color:"var(--text)", lineHeight:1.6}}>{kpiInfo[selectedKpi].calculation}</div>
+          </div>
+          <div>
+            <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'IBM Plex Mono',monospace",letterSpacing:0.5,textTransform:"uppercase",marginBottom:5}}>Notes</div>
+            <ul style={{margin:0, paddingLeft:18, fontSize:12.5, color:"var(--muted)", lineHeight:1.7}}>
+              {kpiInfo[selectedKpi].notes.map((n, i) => <li key={i}>{n}</li>)}
+            </ul>
           </div>
         </Modal>
       )}

@@ -1,5 +1,6 @@
 function Dashboard({ data, setPage, setRentalFilter }) {
   const { inventory, rentals, deposits, categories } = data;
+  const [showAllActivity, setShowAllActivity] = useState(false);
   const activeRentals = rentals.filter(r => !r.ActualReturn);
   const returned      = rentals.filter(r => !!r.ActualReturn);
   const now           = new Date();
@@ -24,15 +25,19 @@ function Dashboard({ data, setPage, setRentalFilter }) {
   ];
 
   // Recent activity — derived from latest rentals
-  const recentActivity = [...rentals]
+  const allActivity = [...rentals]
     .sort((a, b) => new Date(b.DateOut) - new Date(a.DateOut))
-    .slice(0, 4)
     .map(r => ({
       label: r.ActualReturn ? "Rental Returned" : "Rental Created",
       sub:   `${r.Item} · ${r.Customer}`,
       date:  fmtDate(r.ActualReturn || r.DateOut),
       tone:  r.ActualReturn ? "green" : "amber",
     }));
+  const recentActivity = allActivity.slice(0, 4);
+
+  // Rentals currently out, most recent first, capped for the dashboard table
+  const activeRentalsSorted = [...activeRentals].sort((a, b) => new Date(b.DateOut) - new Date(a.DateOut));
+  const recentActiveRentals = activeRentalsSorted.slice(0, 5);
 
   const bottomPanelStyle = {
     background: "var(--card)",
@@ -120,7 +125,7 @@ function Dashboard({ data, setPage, setRentalFilter }) {
             {activeRentals.length === 0 && (
               <tr><td colSpan="6" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No active rentals.</td></tr>
             )}
-            {activeRentals.map(r => {
+            {recentActiveRentals.map(r => {
               const isOverdue = new Date(r.ExpectedBack) < now;
               return (
                 <tr key={r.RentalID} className="row-clickable" onClick={() => { setRentalFilter("On Loan"); setPage("rentals"); }}>
@@ -155,7 +160,7 @@ function Dashboard({ data, setPage, setRentalFilter }) {
                   <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:"var(--muted)"}}>{c.count}</span>
                 </div>
                 <div style={{height:4,background:"var(--line)",borderRadius:4,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${(c.count/maxCat)*100}%`,background:"var(--amber)",borderRadius:4,transition:"width .4s"}}></div>
+                  <div style={{height:"100%",width:"100%",background:"var(--amber)",borderRadius:4}}></div>
                 </div>
               </div>
             ))}
@@ -167,7 +172,11 @@ function Dashboard({ data, setPage, setRentalFilter }) {
           <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'IBM Plex Mono',monospace",letterSpacing:0.5,marginBottom:16,textTransform:"uppercase"}}>Rental Status</div>
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             {statusBreakdown.map(s => (
-              <div key={s.label} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div
+                key={s.label}
+                style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}
+                onClick={() => { setRentalFilter(s.label === "Returned" ? "Returned" : "On Loan"); setPage("rentals"); }}
+              >
                 <div style={{display:"flex",alignItems:"center",gap:9}}>
                   <span style={{width:8,height:8,borderRadius:"50%",background:`var(--${s.tone})`}}></span>
                   <span style={{fontSize:13}}>{s.label}</span>
@@ -180,7 +189,12 @@ function Dashboard({ data, setPage, setRentalFilter }) {
 
         {/* Recent Activity */}
         <div style={bottomPanelStyle}>
-          <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'IBM Plex Mono',monospace",letterSpacing:0.5,marginBottom:16,textTransform:"uppercase"}}>Recent Activity</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <span style={{fontSize:11,color:"var(--muted)",fontFamily:"'IBM Plex Mono',monospace",letterSpacing:0.5,textTransform:"uppercase"}}>Recent Activity</span>
+            {allActivity.length > 4 && (
+              <span style={{fontSize:11.5,color:"var(--amber)",cursor:"pointer",fontWeight:600}} onClick={() => setShowAllActivity(true)}>View All</span>
+            )}
+          </div>
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             {recentActivity.length === 0 && <span style={{fontSize:13,color:"var(--muted)"}}>No activity yet.</span>}
             {recentActivity.map((a, i) => (
@@ -193,6 +207,19 @@ function Dashboard({ data, setPage, setRentalFilter }) {
         </div>
 
       </div>
+
+      {showAllActivity && (
+        <Modal title="All Recent Activity" onClose={() => setShowAllActivity(false)} width={420}>
+          <div style={{display:"flex",flexDirection:"column",gap:14,maxHeight:420,overflowY:"auto"}}>
+            {allActivity.map((a, i) => (
+              <div key={i}>
+                <div style={{fontSize:13,fontWeight:500}}>{a.label}</div>
+                <div style={{fontSize:11.5,color:"var(--muted)",marginTop:2}}>{a.sub} · {a.date}</div>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
     </>
   );
 }

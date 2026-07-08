@@ -594,8 +594,27 @@ html, body {
 
 @media (max-width: 860px) {
   .page { grid-template-columns: 1fr; }
-  .left { display: none; }
-  .right { padding: 40px 24px; }
+  .left {
+    position: static;
+    height: auto;
+    overflow: visible;
+    order: 2;
+  }
+  .right { order: 1; padding: 32px 24px; }
+  .left-section { padding: 32px 24px; }
+  .left-section.hero { min-height: auto; padding: 40px 24px 32px; }
+  .left-headline { font-size: 30px; }
+  .stats-row { flex-wrap: wrap; row-gap: 16px; }
+  .cat-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .features-grid { grid-template-columns: 1fr; }
+  .left-footer { grid-template-columns: 1fr; gap: 24px; padding: 28px 24px; }
+}
+
+@media (max-width: 480px) {
+  .left-headline { font-size: 25px; }
+  .cat-grid { grid-template-columns: 1fr; }
+  .right { padding: 24px 18px; }
+  .right-inner { max-width: 100%; }
 }
 </style>
 </head>

@@ -861,15 +861,22 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
   const [confirmArchiveRental, setConfirmArchiveRental] = useState(null);
   const [confirmRestoreRental, setConfirmRestoreRental] = useState(null);
   const [confirmReturn, setConfirmReturn] = useState(false);
+  const [search, setSearch] = useState("");
   const filters = ["All","On Loan","Returned","Archived"];
 
   const availableItems = inventory.filter(i => i.Status === "Available");
+  const q = search.trim().toLowerCase();
   const rows = rentals.filter(r => {
     const isArchived = Number(r.Archived) === 1;
-    if (rentalFilter === "Archived") return isArchived;
-    if (isArchived) return false;
-    if (rentalFilter === "All") return true;
-    return rentalFilter === "On Loan" ? !r.ActualReturn : !!r.ActualReturn;
+    if (rentalFilter === "Archived") { if (!isArchived) return false; }
+    else if (isArchived) { return false; }
+    else if (rentalFilter !== "All" && !(rentalFilter === "On Loan" ? !r.ActualReturn : !!r.ActualReturn)) {
+      return false;
+    }
+    if (!q) return true;
+    return String(r.RentalID).includes(q) ||
+      r.Customer.toLowerCase().includes(q) ||
+      r.Item.toLowerCase().includes(q);
   });
 
   const submitRental = (e) => {
@@ -945,10 +952,16 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
   return (
     <>
       <div className="pill-row" style={{justifyContent:"space-between", display:"flex", flexWrap:"wrap", gap:10}}>
-        <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+        <div style={{display:"flex", gap:8, flexWrap:"wrap", alignItems:"center"}}>
           {filters.map(f => (
             <div key={f} className={`pill ${rentalFilter===f ? "on":""}`} onClick={() => setRentalFilter(f)}>{f}</div>
           ))}
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by rental ID, customer, or item…"
+            style={{...inputStyle, width:240, padding:"7px 12px", fontSize:12.5}}
+          />
         </div>
         <div className="pill" style={{background:"var(--amber)", color:"#1A1320", borderColor:"var(--amber)", fontWeight:600}} onClick={() => setShowForm(true)}>
           + New Rental
@@ -958,6 +971,9 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
         <table>
           <thead><tr><th>Rental ID</th><th>Customer</th><th>Item</th><th>Date out</th><th>Expected back</th><th>Actual return</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan="8" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No rentals match your search.</td></tr>
+            )}
             {rows.map(r => (
               <tr key={r.RentalID}>
                 <td className="mono-cell">RNT-{r.RentalID}</td>
@@ -1083,24 +1099,45 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
 function DepositsPage({ data }) {
   const { deposits } = data;
   const [filter, setFilter] = useState("All");
+  const [search, setSearch] = useState("");
   const filters = ["All","Held","Full Refund","Partial Refund","Forfeited"];
-  const rows = deposits.filter(d => filter === "All" || d.RefundStatus === filter);
+  const q = search.trim().toLowerCase();
+  const rows = deposits.filter(d => {
+    if (filter !== "All" && d.RefundStatus !== filter) return false;
+    if (!q) return true;
+    return String(d.DepositID).includes(q) ||
+      String(d.RentalID).includes(q) ||
+      (d.Customer || "").toLowerCase().includes(q) ||
+      (d.Item || "").toLowerCase().includes(q);
+  });
 
   return (
     <>
-      <div className="pill-row">
-        {filters.map(f => (
-          <div key={f} className={`pill ${filter===f ? "on":""}`} onClick={() => setFilter(f)}>{f}</div>
-        ))}
+      <div className="pill-row" style={{justifyContent:"space-between", display:"flex", flexWrap:"wrap", gap:10}}>
+        <div style={{display:"flex", gap:8, flexWrap:"wrap", alignItems:"center"}}>
+          {filters.map(f => (
+            <div key={f} className={`pill ${filter===f ? "on":""}`} onClick={() => setFilter(f)}>{f}</div>
+          ))}
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by deposit ID, rental ID, or customer…"
+            style={{...inputStyle, width:260, padding:"7px 12px", fontSize:12.5}}
+          />
+        </div>
       </div>
       <Frame>
         <table>
-          <thead><tr><th>Deposit ID</th><th>Linked Rental</th><th>Amount</th><th>Refund Status</th></tr></thead>
+          <thead><tr><th>Deposit ID</th><th>Linked Rental</th><th>Customer</th><th>Amount</th><th>Refund Status</th></tr></thead>
           <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan="5" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No deposits match your search.</td></tr>
+            )}
             {rows.map(d => (
               <tr key={d.DepositID}>
                 <td className="mono-cell">DEP-{d.DepositID}</td>
                 <td className="mono-cell">RNT-{d.RentalID}</td>
+                <td>{d.Customer}</td>
                 <td className="mono-cell">₱{Number(d.AmountHeld).toLocaleString()}</td>
                 <td><Chip tone={statusTone(d.RefundStatus)}>{d.RefundStatus}</Chip></td>
               </tr>

@@ -116,10 +116,10 @@ function CustomerApp() {
   }
   function notifLabel(r) {
     const amt = parseFloat(r.AmountHeld || 0).toLocaleString();
-    if (r.RefundStatus === 'Full Refund')   return `Deposit ₱${amt} refunded for completed rental #${r.RentalID}`;
-    if (r.RefundStatus === 'Partial Refund') return `Partial deposit ₱${amt} refunded for rental #${r.RentalID}`;
-    if (r.RefundStatus === 'Forfeited')      return `Deposit ₱${amt} forfeited for rental #${r.RentalID}`;
-    return `Rental #${r.RentalID} returned — deposit review pending`;
+    if (r.RefundStatus === 'Full Refund')   return `Deposit ₱${amt} refunded for completed rental ID ${r.RentalID}`;
+    if (r.RefundStatus === 'Partial Refund') return `Partial deposit ₱${amt} refunded for rental ID ${r.RentalID}`;
+    if (r.RefundStatus === 'Forfeited')      return `Deposit ₱${amt} forfeited for rental ID ${r.RentalID}`;
+    return `Rental ID ${r.RentalID} returned — deposit review pending`;
   }
 
   const allNotifications = rentals.flatMap(r => {
@@ -127,7 +127,7 @@ function CustomerApp() {
     if (!r.ActualReturn) {
       items.push({
         id: 'active-'+r.RentalID, tone: 'green', date: new Date(r.DateOut),
-        text: `Rental #${r.RentalID} active — ${r.Item} currently out`,
+        text: `Rental ID ${r.RentalID} active — ${r.Item} currently out`,
         time: `Due back: ${fmtDate(r.ExpectedBack)}`,
         icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
       });

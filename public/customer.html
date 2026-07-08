@@ -587,9 +587,15 @@ function CustomerCatalog({ data, onRent }) {
             {selectedItem.CategoryName} · {getBrand(selectedItem.ItemName)} · Serial {selectedItem.SerialNumber}
           </div>
 
-          <div style={{display:'flex',gap:8,marginBottom:18}}>
+          <div style={{display:'flex',gap:8,marginBottom:14}}>
             <Chip tone={condTone(selectedItem.ConditionStatus)}>{selectedItem.ConditionStatus}</Chip>
           </div>
+
+          {selectedItem.Description && (
+            <div style={{fontSize:12.5,color:'var(--text)',lineHeight:1.6,marginBottom:18}}>
+              {selectedItem.Description}
+            </div>
+          )}
 
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
             <span style={{fontSize:12,color:'var(--muted)'}}>Rental Rate</span>

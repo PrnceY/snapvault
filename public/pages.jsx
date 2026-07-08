@@ -877,6 +877,7 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
   const [confirmRestoreRental, setConfirmRestoreRental] = useState(null);
   const [confirmReturn, setConfirmReturn] = useState(false);
   const [search, setSearch] = useState("");
+  const [selectedRental, setSelectedRental] = useState(null);
   const filters = ["All","On Loan","Returned","Archived"];
 
   const availableItems = inventory.filter(i => i.Status === "Available");
@@ -989,12 +990,21 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
             {rows.length === 0 && (
               <tr><td colSpan="9" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No rentals match your search.</td></tr>
             )}
-            {rows.map(r => (
-              <tr key={r.RentalID}>
+            {rows.map(r => {
+              const itemNames = r.Item.split(", ");
+              return (
+              <tr key={r.RentalID} className="row-clickable" onClick={() => setSelectedRental(r)}>
                 <td className="mono-cell">RNT-{r.RentalID}</td>
                 <td className="mono-cell">CUS-{String(r.CustomerID).padStart(3,"0")}</td>
                 <td>{r.Customer}</td>
-                <td>{r.Item}</td>
+                <td>
+                  <span style={{display:"inline-flex", alignItems:"center", gap:6}}>
+                    <span>{itemNames[0]}</span>
+                    {itemNames.length > 1 && (
+                      <span style={{opacity:0.45, fontSize:11.5, fontWeight:700}}>+{itemNames.length - 1}</span>
+                    )}
+                  </span>
+                </td>
                 <td className="mono-cell">{fmtDate(r.DateOut)}</td>
                 <td className="mono-cell">{fmtDate(r.ExpectedBack)}</td>
                 <td className="mono-cell">{r.ActualReturn ? fmtDate(r.ActualReturn) : "—"}</td>
@@ -1007,7 +1017,7 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
                     return <Chip tone={tone}>{label}</Chip>;
                   })()}
                 </td>
-                <td>
+                <td onClick={e => e.stopPropagation()}>
                   {Number(r.Archived) === 1 ? (
                     <span
                       style={{fontSize:11.5, color:"var(--amber)", cursor:"pointer", fontWeight:600}}
@@ -1032,10 +1042,43 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
                   )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </Frame>
+
+      {selectedRental && (
+        <Modal title={`Rental RNT-${selectedRental.RentalID}`} onClose={() => setSelectedRental(null)}>
+          <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:0.5,marginBottom:8}}>Item(s) Rented</div>
+          {selectedRental.ItemDetails
+            ? selectedRental.ItemDetails.split("<|>").map((pair, idx, arr) => {
+                const [name, serial] = pair.split("<::>");
+                return (
+                  <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom: idx < arr.length - 1 ? "1px solid var(--line)" : "none"}}>
+                    <span style={{fontSize:13.5,fontWeight:500}}>{name}</span>
+                    <span style={{fontSize:11.5,color:"var(--amber)",fontFamily:"'IBM Plex Mono',monospace",background:"var(--card-hover)",padding:"2px 8px",borderRadius:6,flexShrink:0,marginLeft:10}}>{serial}</span>
+                  </div>
+                );
+              })
+            : <div style={{fontSize:13.5}}>{selectedRental.Item}</div>
+          }
+          <div style={{display:"flex",gap:20,marginTop:16}}>
+            <div>
+              <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:0.5,marginBottom:5}}>Date Out</div>
+              <div style={{fontSize:13.5}} className="mono-cell">{fmtDate(selectedRental.DateOut) || "—"}</div>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:0.5,marginBottom:5}}>Expected Back</div>
+              <div style={{fontSize:13.5}} className="mono-cell">{fmtDate(selectedRental.ExpectedBack) || "—"}</div>
+            </div>
+          </div>
+          <div style={{marginTop:12}}>
+            <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:0.5,marginBottom:5}}>Customer</div>
+            <div style={{fontSize:13.5}}>{selectedRental.Customer} <span className="mono-cell">(CUS-{String(selectedRental.CustomerID).padStart(3,"0")})</span></div>
+          </div>
+        </Modal>
+      )}
 
       {showForm && (
         <Modal title="New Rental" onClose={() => setShowForm(false)}>

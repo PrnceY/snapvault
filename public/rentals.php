@@ -7,6 +7,7 @@ if ($method === 'GET') {
     $sql = "SELECT r.RentalID, r.CustomerID,
                CONCAT_WS(' ', c.FirstName, NULLIF(c.MiddleName,''), c.LastName) AS Customer,
                GROUP_CONCAT(i.ItemName SEPARATOR ', ') AS Item,
+               GROUP_CONCAT(CONCAT(i.ItemName, '<::>', i.SerialNumber) ORDER BY ri.RentalItemID SEPARATOR '<|>') AS ItemDetails,
                r.DateOut, r.ExpectedBack, r.ActualReturn, r.Status, r.Archived
         FROM Rentals r
         JOIN Customers c ON r.CustomerID = c.CustomerID

@@ -1207,9 +1207,19 @@ function CustomerProfile({ profile, rentals, onProfileUpdated }) {
         <Modal title={`Deposit DEP-${selectedDeposit.DepositID}`} onClose={() => setSelectedDeposit(null)}>
           <div style={{display:'flex',flexDirection:'column',gap:14}}>
             <div>
-              <div style={{fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:5}}>Item(s) Rented</div>
-              <div style={{fontSize:14,fontWeight:500}}>{selectedDeposit.Item || '—'}</div>
-              <div style={{fontSize:12,color:'var(--muted)',fontFamily:"'IBM Plex Mono',monospace",marginTop:3}}>{selectedDeposit.Serials || '—'}</div>
+              <div style={{fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:8}}>Item(s) Rented</div>
+              {selectedDeposit.ItemDetails
+                ? selectedDeposit.ItemDetails.split('<|>').map((pair, idx) => {
+                    const [name, serial] = pair.split('<::>');
+                    return (
+                      <div key={idx} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom: idx < selectedDeposit.ItemDetails.split('<|>').length - 1 ? '1px solid var(--line)' : 'none'}}>
+                        <span style={{fontSize:13.5,fontWeight:500}}>{name}</span>
+                        <span style={{fontSize:11.5,color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace",background:'var(--card-hover)',padding:'2px 8px',borderRadius:6,flexShrink:0,marginLeft:10}}>{serial}</span>
+                      </div>
+                    );
+                  })
+                : <div style={{fontSize:14,fontWeight:500}}>—</div>
+              }
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
               <div>

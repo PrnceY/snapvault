@@ -4,7 +4,7 @@ function Dashboard({ data, setPage, setRentalFilter }) {
   const returned      = rentals.filter(r => !!r.ActualReturn);
   const now           = new Date();
   const overdueList   = activeRentals.filter(r => new Date(r.ExpectedBack) < now);
-  const availableUnits = inventory.filter(i => !i.Archived && i.Status === "Available").length;
+  const availableUnits = inventory.filter(i => Number(i.Archived) === 0 && i.Status === "Available").length;
   const heldTotal     = deposits
     .filter(d => d.RefundStatus === "Held")
     .reduce((a, d) => a + Number(d.AmountHeld), 0);
@@ -12,7 +12,7 @@ function Dashboard({ data, setPage, setRentalFilter }) {
   // Equipment by category counts
   const catCounts = categories.map(c => ({
     name: c.CategoryName,
-    count: inventory.filter(i => i.CategoryName === c.CategoryName && !i.Archived).length,
+    count: inventory.filter(i => i.CategoryName === c.CategoryName && Number(i.Archived) === 0).length,
   }));
   const maxCat = Math.max(...catCounts.map(c => c.count), 1);
 
@@ -55,7 +55,7 @@ function Dashboard({ data, setPage, setRentalFilter }) {
           <div className="num">{availableUnits}</div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <span className="lab">Available for rental</span>
-            <span style={{fontSize:11,color:"var(--green)",fontFamily:"'IBM Plex Mono',monospace"}}>+{inventory.filter(i=>!i.Archived).length} total</span>
+            <span style={{fontSize:11,color:"var(--green)",fontFamily:"'IBM Plex Mono',monospace"}}>+{inventory.filter(i=>Number(i.Archived)===0).length} total</span>
           </div>
         </div>
 
@@ -1274,7 +1274,7 @@ function ReportsPage({ data }) {
       return sum + days;
     }, 0) / returned.length
   ).toFixed(1);
-  const totalUnits   = inventory.filter(i => !i.Archived).length;
+  const totalUnits   = inventory.filter(i => Number(i.Archived) === 0).length;
   const rentedNow    = inventory.filter(i => i.Status === "Rented").length;
   const utilization  = totalUnits === 0 ? 0 : Math.round((rentedNow / totalUnits) * 100);
 

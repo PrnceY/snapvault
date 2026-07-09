@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>SnapVault — Super Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#15141B;--card:#1E1C26;--card-hover:#262430;--line:#2C2A36;--text:#F3EFE6;--muted:#9C97A8;--amber:#FFB454;--rose:#FB7185;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:34px;width:360px;}
+  h1{font-family:'Space Grotesk',sans-serif;font-size:18px;margin-bottom:4px;}
+  p.sub{color:var(--muted);font-size:12.5px;margin-bottom:22px;}
+  label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;}
+  input{width:100%;background:var(--card-hover);border:1px solid var(--line);border-radius:8px;padding:10px 11px;color:var(--text);font-size:13.5px;font-family:'Inter',sans-serif;outline:none;margin-bottom:14px;}
+  button{width:100%;padding:11px;border-radius:9px;border:none;cursor:pointer;background:var(--amber);color:#1A1320;font-weight:700;font-size:13.5px;}
+  .err{color:var(--rose);font-size:12.5px;margin-bottom:12px;display:none;}
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1>Super Admin</h1>
+    <p class="sub">Platform-level access. Not for shop or customer use.</p>
+    <div class="err" id="err"></div>
+    <label>Email</label>
+    <input id="email" type="email" />
+    <label>Password</label>
+    <input id="pw" type="password" />
+    <button onclick="signIn()">Sign In</button>
+  </div>
+  <script>
+    async function signIn() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('pw').value;
+      const errEl = document.getElementById('err');
+      errEl.style.display = 'none';
+      try {
+        const res = await fetch('auth.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, loginAs: 'superadmin' }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          errEl.textContent = data.error || 'Invalid email or password.';
+          errEl.style.display = 'block';
+          return;
+        }
+        window.location.href = 'superadmin.html';
+      } catch (e) {
+        errEl.textContent = 'Could not reach the server.';
+        errEl.style.display = 'block';
+      }
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Enter') signIn(); });
+  </script>
+</body>
+</html>

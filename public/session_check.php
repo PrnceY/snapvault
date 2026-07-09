@@ -3,4 +3,5 @@ session_start();
 echo json_encode([
   "role" => $_SESSION['role'] ?? null,
   "customerID" => $_SESSION['customerID'] ?? null,
+  "superAdminID" => $_SESSION['superAdminID'] ?? null,
 ]);

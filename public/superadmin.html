@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>SnapVault — Super Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+  fetch('session_check.php')
+    .then(r => r.json())
+    .then(d => { if (d.role !== 'superadmin') window.location.href = 'superadmin_login.html'; })
+    .catch(() => window.location.href = 'superadmin_login.html');
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="shared.jsx"></script>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+function SuperAdminApp() {
+  const [shops, setShops] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState(null); // {ShopID, ShopName, Active}
+  const [form, setForm] = useState({ ShopName:"", Email:"", Password:"" });
+  const [formErr, setFormErr] = useState("");
+
+  const load = () => fetch('shops.php').then(r => r.json()).then(d => { setShops(d); setLoading(false); });
+  useEffect(() => { load(); }, []);
+
+  const addShop = () => {
+    setFormErr("");
+    if (!form.ShopName || !form.Email || !form.Password) { setFormErr("All fields are required."); return; }
+    fetch('shops.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'add', ...form }) })
+      .then(r => r.json())
+      .then(d => {
+        if (!d.success) { setFormErr(d.error || "Could not create shop."); return; }
+        setShowAdd(false); setForm({ ShopName:"", Email:"", Password:"" }); load();
+      });
+  };
+
+  const toggleActive = () => {
+    const action = confirmTarget.Active ? 'deactivate' : 'activate';
+    fetch('shops.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action, ShopID: confirmTarget.ShopID }) })
+      .then(r => r.json())
+      .then(() => { setConfirmTarget(null); load(); });
+  };
+
+  return (
+    <div className="app">
+      <aside className="sidebar" style={{width:228}}>
+        <div className="brand">
+          <div className="brand-mark"><ApertureIcon /></div>
+          <div className="brand-text"><span className="name">SnapVault</span><span className="sub">SUPER ADMIN</span></div>
+        </div>
+      </aside>
+      <div className="main">
+        <header className="topbar"><div className="topbar-inner"><div className="topbar-title">Shops</div></div></header>
+        <main className="content">
+          <div className="cards-grid" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
+            <div className="stat-card"><div className="lab">Total Shops</div><div className="num">{shops.length}</div></div>
+            <div className="stat-card"><div className="lab">Active</div><div className="num">{shops.filter(s=>s.Active==1).length}</div></div>
+            <div className="stat-card"><div className="lab">Deactivated</div><div className="num">{shops.filter(s=>s.Active==0).length}</div></div>
+          </div>
+          <div className="section-head"><h2>All Shops</h2>
+            <button style={{...buttonStyle, width:"auto", marginTop:0}} onClick={() => setShowAdd(true)}>+ Add Shop</button>
+          </div>
+          <Frame>
+            {loading ? <p style={{padding:16,color:"var(--muted)"}}>Loading…</p> : (
+              <table>
+                <thead><tr><th>Shop</th><th>Email</th><th>Units</th><th>Customers</th><th>Active Rentals</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                  {shops.map(s => (
+                    <tr key={s.ShopID}>
+                      <td className="empty-name">{s.ShopName}</td>
+                      <td className="mono-cell">{s.Email}</td>
+                      <td>{s.UnitCount}</td>
+                      <td>{s.CustomerCount}</td>
+                      <td>{s.ActiveRentals}</td>
+                      <td><Chip tone={s.Active==1 ? "green" : "rose"}>{s.Active==1 ? "Active" : "Deactivated"}</Chip></td>
+                      <td>
+                        <span style={{cursor:"pointer",color:"var(--amber)",fontSize:12.5,fontWeight:600}}
+                          onClick={() => setConfirmTarget(s)}>
+                          {s.Active==1 ? "Deactivate" : "Activate"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Frame>
+        </main>
+      </div>
+
+      {showAdd && (
+        <Modal title="Add Shop" onClose={() => setShowAdd(false)}>
+          <FormField label="Shop Name"><input style={inputStyle} value={form.ShopName} onChange={e=>setForm({...form,ShopName:e.target.value})} /></FormField>
+          <FormField label="Email"><input style={inputStyle} value={form.Email} onChange={e=>setForm({...form,Email:e.target.value})} /></FormField>
+          <FormField label="Password"><input type="password" style={inputStyle} value={form.Password} onChange={e=>setForm({...form,Password:e.target.value})} /></FormField>
+          {formErr && <p style={{color:"var(--rose)",fontSize:12.5,marginBottom:10}}>{formErr}</p>}
+          <button style={buttonStyle} onClick={addShop}>Create Shop</button>
+        </Modal>
+      )}
+
+      {confirmTarget && (
+        <ConfirmDialog
+          title={confirmTarget.Active ? "Deactivate Shop" : "Activate Shop"}
+          message={`Are you sure you want to ${confirmTarget.Active ? "deactivate" : "activate"} "${confirmTarget.ShopName}"?`}
+          confirmLabel={confirmTarget.Active ? "Deactivate" : "Activate"}
+          confirmTone={confirmTarget.Active ? "rose" : "green"}
+          onConfirm={toggleActive}
+          onCancel={() => setConfirmTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<SuperAdminApp />);
+</script>
+</body>
+</html>

@@ -720,7 +720,7 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onCons
 
   // Cart helpers
   const totalRate    = cart.reduce((sum, i) => sum + getRentalRate(i), 0);
-  const totalDeposit = totalRate * 2;
+  const totalDeposit = Math.min(Math.max(totalRate * days * 0.5, totalRate), totalRate * 10);
   const totalCost    = totalRate * days;
 
   const [limitMsg, setLimitMsg] = useState(null);
@@ -1013,7 +1013,8 @@ function CustomerProfile({ profile, rentals, onProfileUpdated }) {
   const depTone  = s => s === 'Full Refund' ? 'green' : s === 'Held' ? 'amber' : s === 'Forfeited' ? 'rose' : 'muted';
   const depLabel = s => s === 'Full Refund' ? 'Refunded' : s;
   const [selectedDeposit, setSelectedDeposit] = useState(null);
-
+  const [showAllDeposits, setShowAllDeposits] = useState(false);
+  const visibleDeposits = showAllDeposits ? deposits : deposits.slice(0, 3);
   const [editing, setEditing] = useState(false);
   const [form, setForm]       = useState({ FirstName: profile.FirstName || '', MiddleName: profile.MiddleName || '', LastName: profile.LastName || '', ContactNumber: profile.ContactNumber || '', IDType: profile.IDType || '' });
   const [saving, setSaving]           = useState(false);
@@ -1180,7 +1181,10 @@ function CustomerProfile({ profile, rentals, onProfileUpdated }) {
       {/* Deposit history */}
       {deposits.length > 0 && (
         <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'20px 22px'}}>
-          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:15,marginBottom:16}}>Deposit History</div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:15}}>Deposit History</div>
+            <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:11.5,color:'var(--muted)'}}>{deposits.length} total</div>
+          </div>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
             <thead>
               <tr>
@@ -1190,7 +1194,7 @@ function CustomerProfile({ profile, rentals, onProfileUpdated }) {
               </tr>
             </thead>
             <tbody>
-              {deposits.map((r,i)=>(
+              {visibleDeposits.map((r,i)=>(
                 <tr key={i} className="row-clickable" onClick={() => setSelectedDeposit(r)}>
                   <td style={{padding:'12px',borderBottom:'1px solid var(--line)',color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12}}>DEP-{r.DepositID}</td>
                   <td style={{padding:'12px',borderBottom:'1px solid var(--line)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:'var(--muted)'}}>RNT-{r.RentalID}</td>
@@ -1200,6 +1204,14 @@ function CustomerProfile({ profile, rentals, onProfileUpdated }) {
               ))}
             </tbody>
           </table>
+          {deposits.length > 3 && (
+            <div
+              onClick={() => setShowAllDeposits(v => !v)}
+              style={{textAlign:'center',marginTop:14,padding:'9px',borderRadius:8,border:'1px solid var(--line)',background:'var(--card-hover)',color:'var(--amber)',fontSize:12.5,fontWeight:600,cursor:'pointer'}}
+            >
+              {showAllDeposits ? 'Show Less' : `View All (${deposits.length})`}
+            </div>
+          )}
         </div>
       )}
 

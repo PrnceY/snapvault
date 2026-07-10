@@ -760,10 +760,7 @@ function CustomersPage({ data }) {
             style={{...inputStyle, width:220, padding:"7px 12px", fontSize:12.5}}
           />
         </div>
-        <div className="pill" style={{background:"var(--amber)", color:"#1A1320", borderColor:"var(--amber)", fontWeight:600}} onClick={() => setShowForm(true)}>
-          + Add Customer
         </div>
-      </div>
       <Frame>
         <table>
           <thead><tr><th>Customer ID</th><th>First Name</th><th>Last Name</th><th>ID Type</th><th>Contact</th><th>Verification</th></tr></thead>
@@ -792,32 +789,6 @@ function CustomersPage({ data }) {
           </tbody>
         </table>
       </Frame>
-
-      {showForm && (
-        <Modal title="Add Customer" onClose={() => setShowForm(false)}>
-          <form onSubmit={submit}>
-            <FormField label="First Name">
-              <input style={inputStyle} value={form.FirstName} onChange={e => setForm({...form, FirstName:e.target.value})} placeholder="e.g. Juan" />
-            </FormField>
-            <FormField label="Middle Name (optional)">
-              <input style={inputStyle} value={form.MiddleName} onChange={e => setForm({...form, MiddleName:e.target.value})} placeholder="e.g. Santos" />
-            </FormField>
-            <FormField label="Last Name">
-              <input style={inputStyle} value={form.LastName} onChange={e => setForm({...form, LastName:e.target.value})} placeholder="e.g. Dela Cruz" />
-            </FormField>
-            <FormField label="ID Type">
-              <select style={inputStyle} value={form.IDType} onChange={e => setForm({...form, IDType:e.target.value})}>
-                <option>School ID</option><option>Driver's License</option><option>Passport</option>
-              </select>
-            </FormField>
-            <FormField label="Contact Number">
-              <input style={inputStyle} value={form.ContactNumber} onChange={e => setForm({...form, ContactNumber:e.target.value})} placeholder="e.g. 0917 000 0000" />
-            </FormField>
-            {formError && <p style={{color:"var(--rose)", fontSize:12.5, marginTop:4}}>{formError}</p>}
-            <button type="submit" style={buttonStyle} disabled={saving}>{saving ? "Saving…" : "Add Customer"}</button>
-          </form>
-        </Modal>
-      )}
 
       {reviewing && (
         <Modal title={`Review ID — ${reviewing.FullName}`} onClose={() => { setReviewing(null); setReviewError(null); }}>

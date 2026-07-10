@@ -979,10 +979,7 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
             style={{...inputStyle, width:240, padding:"7px 12px", fontSize:12.5}}
           />
         </div>
-        <div className="pill" style={{background:"var(--amber)", color:"#1A1320", borderColor:"var(--amber)", fontWeight:600}} onClick={() => setShowForm(true)}>
-          + New Rental
         </div>
-      </div>
       <Frame>
         <table>
           <thead><tr><th>Rental ID</th><th>Customer ID</th><th>Customer</th><th>Item</th><th>Date out</th><th>Expected back</th><th>Actual return</th><th>Status</th><th>Actions</th></tr></thead>
@@ -1077,34 +1074,6 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
             <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:0.5,marginBottom:5}}>Customer</div>
             <div style={{fontSize:13.5}}>{selectedRental.Customer} <span className="mono-cell">(CUS-{String(selectedRental.CustomerID).padStart(3,"0")})</span></div>
           </div>
-        </Modal>
-      )}
-
-      {showForm && (
-        <Modal title="New Rental" onClose={() => setShowForm(false)}>
-          <form onSubmit={submitRental}>
-            <FormField label="Customer">
-              <select style={inputStyle} value={form.CustomerID} onChange={e => setForm({...form, CustomerID:e.target.value})}>
-                <option value="">Select a customer</option>
-                {customers.map(c => <option key={c.CustomerID} value={c.CustomerID}>{c.FullName}</option>)}
-              </select>
-            </FormField>
-            <FormField label="Item (available only)">
-              <select style={inputStyle} value={form.SerialNumber} onChange={e => setForm({...form, SerialNumber:e.target.value})}>
-                <option value="">Select an item</option>
-                {availableItems.map(i => <option key={i.SerialNumber} value={i.SerialNumber}>{i.ItemName} ({i.SerialNumber})</option>)}
-              </select>
-              {availableItems.length === 0 && <p style={{fontSize:11.5, color:"var(--muted)", marginTop:5}}>No items are currently available.</p>}
-            </FormField>
-            <FormField label="Expected Back">
-              <input type="date" style={inputStyle} value={form.ExpectedBack} onChange={e => setForm({...form, ExpectedBack:e.target.value})} />
-            </FormField>
-            <FormField label="Deposit Amount (₱)">
-              <input type="number" min="0" style={inputStyle} value={form.DepositAmount} onChange={e => setForm({...form, DepositAmount:e.target.value})} placeholder="e.g. 5000" />
-            </FormField>
-            {formError && <p style={{color:"var(--rose)", fontSize:12.5, marginTop:4}}>{formError}</p>}
-            <button type="submit" style={buttonStyle} disabled={saving}>{saving ? "Saving…" : "Create Rental"}</button>
-          </form>
         </Modal>
       )}
 

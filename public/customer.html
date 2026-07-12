@@ -23,7 +23,9 @@
   .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; background: var(--card); border-bottom: 1px solid var(--line); }
   .topbar-left .topbar-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px; color: var(--text); }
   .topbar-left .topbar-sub  { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .topbar-right { display: flex; align-items: center; gap: 14px; }
+  .topbar-right { display: flex; align-items: center; gap: 14px; position: relative; z-index: 1; }
+  .topbar-left  { position: relative; z-index: 1; }
+  .topbar::after { content: none; }
   .notif-btn { background: none; border: 1px solid var(--line); border-radius: 9px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--muted); position: relative; }
   .notif-btn svg { width: 16px; height: 16px; }
   .notif-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); border: 2px solid var(--card); }

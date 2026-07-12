@@ -76,25 +76,44 @@ function CustomerApp() {
   const [inventory, setInventory]   = useState([]);
   const [custCategories, setCustCategories] = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [preselectItem, setPreselectItem] = useState(null);
+  const [preselectItems, setPreselectItems] = useState([]);
+  const [cartItems, setCartItems]   = useState([]);
+  const [showCart, setShowCart]     = useState(false);
+  const refetchCart = () => fetch('cart.php').then(r => r.json()).then(d => setCartItems(Array.isArray(d) ? d : []));
 
   useEffect(() => {
     Promise.all([
         fetch('customer_data.php').then(r => r.json()),
         fetch('inventory.php').then(r => r.json()),
         fetch('categories.php').then(r => r.json()),
-      ]).then(([d, inv, cats]) => {
+        fetch('cart.php').then(r => r.json()),
+      ]).then(([d, inv, cats, cart]) => {
         setProfile(d.customer);
         setRentals(d.rentals || []);
         setAvailable(d.availableCount || 0);
         setInventory(Array.isArray(inv) ? inv.filter(i => Number(i.Archived) === 0) : []);
         setCustCategories(Array.isArray(cats) ? cats : []);
+        setCartItems(Array.isArray(cart) ? cart : []);
         setLoading(false);
       }).catch(err => {
         console.error('Customer data load failed:', err);
         setLoading(false);
       });
   }, []);
+
+  function toggleCart(item) {
+    const already = cartItems.some(c => c.SerialNumber === item.SerialNumber);
+    fetch('cart.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: already ? 'remove' : 'add', SerialNumber: item.SerialNumber }),
+    }).then(r => r.json()).then(() => refetchCart());
+  }
+
+  function clearCart() {
+    fetch('cart.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'clear' }) })
+      .then(() => setCartItems([]));
+  }
 
   const activeRentals   = rentals.filter(r => !r.ActualReturn);
   const depositOnHold   = rentals.reduce((s, r) => s + (r.ActualReturn ? 0 : parseFloat(r.AmountHeld || 0)), 0);
@@ -232,6 +251,30 @@ function CustomerApp() {
           onCancel={() => setConfirmSignOut(false)}
         />
       )}
+      {showCart && (
+        <Modal title="Your Cart" onClose={() => setShowCart(false)} width={420}>
+          {cartItems.length === 0 ? (
+            <p style={{color:'var(--muted)',fontSize:13}}>Your cart is empty. Browse the catalog to add equipment.</p>
+          ) : (
+            <>
+              <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:16,maxHeight:360,overflowY:'auto'}}>
+                {cartItems.map(item => (
+                  <div key={item.CartID} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid var(--line)'}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:600}}>{item.ItemName}</div>
+                      <div style={{fontSize:11,color:'var(--muted)'}}>{item.CategoryName} · ₱{getRentalRate(item).toLocaleString()}/day</div>
+                    </div>
+                    <span onClick={() => toggleCart(item)} style={{cursor:'pointer',color:'var(--rose)',fontSize:12,fontWeight:600,flexShrink:0}}>Remove</span>
+                  </div>
+                ))}
+              </div>
+              <button style={buttonStyle} onClick={() => { setPreselectItems(cartItems); setShowCart(false); setPage('rent'); }}>
+                Proceed to Rent ({cartItems.length})
+              </button>
+            </>
+          )}
+        </Modal>
+      )}
       {/* ── Main ── */}
       <div className="main">
         {/* Topbar */}
@@ -246,6 +289,17 @@ function CustomerApp() {
             </div>
           </div>
           <div className="topbar-right">
+            <button className="notif-btn" onClick={() => setShowCart(true)} aria-label="Cart">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+              </svg>
+              {cartItems.length > 0 && (
+                <span style={{position:'absolute',top:-5,right:-5,minWidth:16,height:16,padding:'0 3px',borderRadius:8,background:'var(--amber)',color:'#1A1320',fontSize:9.5,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {cartItems.length > 9 ? '9+' : cartItems.length}
+                </span>
+              )}
+            </button>
             <div className="avatar">{initials}</div>
           </div>
         </div>
@@ -414,9 +468,9 @@ function CustomerApp() {
             </>
           )}
 
-          {!loading && page === 'catalog'   && <CustomerCatalog data={{inventory, categories: custCategories}} onRent={(item) => { setPreselectItem(item); setPage('rent'); }} />}
+          {!loading && page === 'catalog'   && <CustomerCatalog data={{inventory, categories: custCategories}} onRent={(item) => { setPreselectItems([item]); setPage('rent'); }} cartItems={cartItems} onToggleCart={toggleCart} />}
           {!loading && page === 'compat'    && <CustomerCompat  data={{inventory}} />}
-          {!loading && page === 'rent'      && <CustomerRent    data={{inventory, categories: custCategories}} profile={profile} onSuccess={() => setPage('dashboard')} refetch={() => fetch('customer_data.php').then(r=>r.json()).then(d=>{setRentals(d.rentals||[]);setAvailable(d.availableCount||0);})} preselectItem={preselectItem} onConsumePreselect={() => setPreselectItem(null)} />}
+          {!loading && page === 'rent'      && <CustomerRent    data={{inventory, categories: custCategories}} profile={profile} onSuccess={() => setPage('dashboard')} refetch={() => fetch('customer_data.php').then(r=>r.json()).then(d=>{setRentals(d.rentals||[]);setAvailable(d.availableCount||0);})} preselectItems={preselectItems} onConsumePreselect={() => setPreselectItems([])} clearCart={clearCart} />}
             {!loading && page === 'profile'   && <CustomerProfile profile={profile} rentals={rentals} onProfileUpdated={() => fetch('customer_data.php').then(r=>r.json()).then(d=>{setProfile(d.customer);setRentals(d.rentals||[]);setAvailable(d.availableCount||0);})} />}
         </main>
       </div>
@@ -444,7 +498,7 @@ function getBrand(name) {
 }
 
 /* ── 1. Equipment Catalog ── */
-function CustomerCatalog({ data, onRent }) {
+function CustomerCatalog({ data, onRent, cartItems, onToggleCart }) {
   const { inventory, categories } = data;
   const [search, setSearch]         = useState('');
   const [catFilter, setCatFilter]   = useState('All');
@@ -467,9 +521,9 @@ function CustomerCatalog({ data, onRent }) {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
   const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
   const condTone = c => c === 'Excellent' ? 'green' : c === 'Good' ? 'amber' : 'rose';
   const availTone = s => s === 'Available' ? 'green' : s === 'Rented' ? 'amber' : 'rose';
+  const isInCart = item => (cartItems || []).some(c => c.SerialNumber === item.SerialNumber);
 
   const sideLabel = { fontSize:10, color:'var(--muted)', fontFamily:"'IBM Plex Mono',monospace", letterSpacing:0.8, textTransform:'uppercase', marginBottom:10, marginTop:18 };
   const filterLink = (active, onClick, label) => (
@@ -601,14 +655,33 @@ function CustomerCatalog({ data, onRent }) {
             <span style={{fontSize:12,color:'var(--muted)'}}>Rental Rate</span>
             <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:16,color:'var(--amber)',fontWeight:600}}>₱{getRentalRate(selectedItem).toLocaleString()}<span style={{color:'var(--muted)',fontWeight:400,fontSize:12}}>/day</span></span>
           </div>
-
-          <button
-            disabled={selectedItem.Status !== 'Available'}
-            onClick={() => { onRent(selectedItem); setSelectedItem(null); }}
-            style={{...buttonStyle, opacity: selectedItem.Status === 'Available' ? 1 : 0.4}}
-          >
-            {selectedItem.Status === 'Available' ? 'Rent Item' : 'Currently Unavailable'}
-          </button>
+          <div style={{display:'flex',gap:8,marginTop:6}}>
+            <button
+              disabled={selectedItem.Status !== 'Available'}
+              onClick={() => { onRent(selectedItem); setSelectedItem(null); }}
+              style={{...buttonStyle, flex:1, marginTop:0, opacity: selectedItem.Status === 'Available' ? 1 : 0.4}}
+            >
+              {selectedItem.Status === 'Available' ? 'Rent Item' : 'Currently Unavailable'}
+            </button>
+            <button
+              disabled={selectedItem.Status !== 'Available'}
+              onClick={() => onToggleCart(selectedItem)}
+              title={isInCart(selectedItem) ? 'Remove from cart' : 'Add to cart'}
+              style={{
+                width:44, flexShrink:0, borderRadius:9, border:'1px solid var(--line)',
+                background: isInCart(selectedItem) ? 'var(--amber)' : 'var(--card-hover)',
+                color: isInCart(selectedItem) ? '#1A1320' : 'var(--text)',
+                cursor: selectedItem.Status === 'Available' ? 'pointer' : 'default',
+                opacity: selectedItem.Status === 'Available' ? 1 : 0.4,
+                display:'flex', alignItems:'center', justifyContent:'center',
+              }}
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill={isInCart(selectedItem) ? '#1A1320' : 'none'} stroke="currentColor" strokeWidth="1.7">
+                <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+              </svg>
+            </button>
+          </div>
         </Modal>
       )}
     </div>
@@ -687,15 +760,14 @@ function CustomerCompat({ data }) {
   );
 }
 
-
-/* ── 3. Rent Equipment (4-step wizard) ── */
-function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onConsumePreselect }) {
+function CustomerRent({ data, profile, onSuccess, refetch, preselectItems, onConsumePreselect, clearCart }) {
   const { inventory, categories } = data;
   const available = inventory.filter(i => i.Status === 'Available' && !Number(i.Archived));
 
+  const hasPreselect = Array.isArray(preselectItems) && preselectItems.length > 0;
   const [step, setStep]       = useState(1);
-  const [selCat, setSelCat]   = useState(preselectItem ? preselectItem.CategoryName : null);   // selected category name
-  const [cart, setCart]       = useState(preselectItem ? [preselectItem] : []);      // array of item objects
+  const [selCat, setSelCat]   = useState(hasPreselect ? preselectItems[0].CategoryName : null);
+  const [cart, setCart]       = useState(hasPreselect ? preselectItems : []);
   const [days, setDays]       = useState(1);
   const [itemPage, setItemPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
@@ -704,9 +776,10 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onCons
   const [refNum, setRefNum]   = useState(null);
   const [err, setErr]         = useState(null);
 
-  useEffect(() => {
-    if (preselectItem && onConsumePreselect) onConsumePreselect();
+    useEffect(() => {
+    if (hasPreselect && onConsumePreselect) onConsumePreselect();
   }, []);
+
 
   const durations = [1, 3, 5, 7, 14, 30];
 
@@ -768,7 +841,7 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItem, onCons
       .then(r => r.json())
       .then(res => {
         setSaving(false);
-        if (res.success) { setRefNum(res.RentalID); setStep(4); refetch(); }
+        if (res.success) { setRefNum(res.RentalID); setStep(4); refetch(); if (clearCart) clearCart(); }
         else setErr(res.error || 'Something went wrong.');
       })
       .catch(() => { setSaving(false); setErr('Could not reach the server.'); });

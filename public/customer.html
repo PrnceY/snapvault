@@ -81,6 +81,7 @@ function CustomerApp() {
   const [preselectItems, setPreselectItems] = useState([]);
   const [cartItems, setCartItems]   = useState([]);
   const [showCart, setShowCart]     = useState(false);
+  const [cartCatFilter, setCartCatFilter] = useState('All');
   const refetchCart = () => fetch('cart.php').then(r => r.json()).then(d => setCartItems(Array.isArray(d) ? d : []));
 
   useEffect(() => {
@@ -254,21 +255,37 @@ function CustomerApp() {
         />
       )}
       {showCart && (
-        <Modal title="Your Cart" onClose={() => setShowCart(false)} width={420}>
+        <Modal title="Your Cart" onClose={() => setShowCart(false)} width={440}>
           {cartItems.length === 0 ? (
             <p style={{color:'var(--muted)',fontSize:13}}>Your cart is empty. Browse the catalog to add equipment.</p>
           ) : (
             <>
-              <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:16,maxHeight:360,overflowY:'auto'}}>
-                {cartItems.map(item => (
-                  <div key={item.CartID} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid var(--line)'}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:600}}>{item.ItemName}</div>
-                      <div style={{fontSize:11,color:'var(--muted)'}}>{item.CategoryName} · ₱{getRentalRate(item).toLocaleString()}/day</div>
-                    </div>
-                    <span onClick={() => toggleCart(item)} style={{cursor:'pointer',color:'var(--rose)',fontSize:12,fontWeight:600,flexShrink:0}}>Remove</span>
-                  </div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>
+                {['All', ...new Set(cartItems.map(i => i.CategoryName))].map(cat => (
+                  <span
+                    key={cat}
+                    onClick={() => setCartCatFilter(cat)}
+                    style={{
+                      padding:'5px 11px', borderRadius:100, fontSize:11.5, fontWeight:500, cursor:'pointer',
+                      border:'1px solid var(--line)',
+                      color: cartCatFilter===cat ? '#1A1320' : 'var(--muted)',
+                      background: cartCatFilter===cat ? 'var(--amber)' : 'var(--card-hover)',
+                    }}
+                  >{cat}</span>
                 ))}
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:16,maxHeight:340,overflowY:'auto'}}>
+                {cartItems
+                  .filter(item => cartCatFilter === 'All' || item.CategoryName === cartCatFilter)
+                  .map(item => (
+                    <div key={item.CartID} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid var(--line)'}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:600}}>{item.ItemName}</div>
+                        <div style={{fontSize:11,color:'var(--muted)'}}>{item.CategoryName} · ₱{getRentalRate(item).toLocaleString()}/day</div>
+                      </div>
+                      <span onClick={() => toggleCart(item)} style={{cursor:'pointer',color:'var(--rose)',fontSize:12,fontWeight:600,flexShrink:0}}>Remove</span>
+                    </div>
+                  ))}
               </div>
               <button style={buttonStyle} onClick={() => { setPreselectItems(cartItems); setShowCart(false); setPage('rent'); }}>
                 Proceed to Rent ({cartItems.length})
@@ -291,7 +308,7 @@ function CustomerApp() {
             </div>
           </div>
           <div className="topbar-right">
-            <button className="notif-btn" onClick={() => setShowCart(true)} aria-label="Cart">
+            <button className="notif-btn" onClick={() => { setCartCatFilter('All'); setShowCart(true); }} aria-label="Cart">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
                 <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
                 <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
@@ -765,11 +782,24 @@ function CustomerCompat({ data }) {
 function CustomerRent({ data, profile, onSuccess, refetch, preselectItems, onConsumePreselect, clearCart }) {
   const { inventory, categories } = data;
   const available = inventory.filter(i => i.Status === 'Available' && !Number(i.Archived));
-
   const hasPreselect = Array.isArray(preselectItems) && preselectItems.length > 0;
+
+  function capPerCategory(items) {
+    const counts = {};
+    const kept = [];
+    let trimmed = false;
+    for (const item of items) {
+      counts[item.CategoryName] = (counts[item.CategoryName] || 0) + 1;
+      if (counts[item.CategoryName] <= 3) kept.push(item);
+      else trimmed = true;
+    }
+    return { kept, trimmed };
+  }
+  const capped = hasPreselect ? capPerCategory(preselectItems) : { kept: [], trimmed: false };
+
   const [step, setStep]       = useState(1);
-  const [selCat, setSelCat]   = useState(hasPreselect ? preselectItems[0].CategoryName : null);
-  const [cart, setCart]       = useState(hasPreselect ? preselectItems : []);
+  const [selCat, setSelCat]   = useState(capped.kept[0]?.CategoryName ?? null);
+  const [cart, setCart]       = useState(capped.kept);
   const [days, setDays]       = useState(1);
   const [itemPage, setItemPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
@@ -798,7 +828,10 @@ function CustomerRent({ data, profile, onSuccess, refetch, preselectItems, onCon
   const totalDeposit = Math.min(Math.max(totalRate * days * 0.5, totalRate), totalRate * 10);
   const totalCost    = totalRate * days;
 
-  const [limitMsg, setLimitMsg] = useState(null);
+    const [limitMsg, setLimitMsg] = useState(
+    capped.trimmed ? 'Your cart had more than 3 items in one category — only the first 3 per category were carried over. Unselect one to swap in another.' : null
+  );
+
 
   function toggleCart(item) {
     const already = cart.find(i => i.SerialNumber === item.SerialNumber);

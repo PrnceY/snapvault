@@ -844,20 +844,15 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
   const [refundChoice, setRefundChoice] = useState("Full Refund");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
-  const [confirmArchiveRental, setConfirmArchiveRental] = useState(null);
-  const [confirmRestoreRental, setConfirmRestoreRental] = useState(null);
   const [confirmReturn, setConfirmReturn] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedRental, setSelectedRental] = useState(null);
-  const filters = ["All","On Loan","Returned","Archived"];
+  const filters = ["All","On Loan","Returned"];
 
   const availableItems = inventory.filter(i => i.Status === "Available");
   const q = search.trim().toLowerCase();
   const rows = rentals.filter(r => {
-    const isArchived = Number(r.Archived) === 1;
-    if (rentalFilter === "Archived") { if (!isArchived) return false; }
-    else if (isArchived) { return false; }
-    else if (rentalFilter !== "All" && !(rentalFilter === "On Loan" ? !r.ActualReturn : !!r.ActualReturn)) {
+    if (rentalFilter !== "All" && !(rentalFilter === "On Loan" ? !r.ActualReturn : !!r.ActualReturn)) {
       return false;
     }
     if (!q) return true;
@@ -914,28 +909,6 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
       .catch(() => { setSaving(false); setFormError("Could not reach the server."); });
   };
 
-  const archiveRental = (rentalId) => {
-    fetch("rentals.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "archive", RentalID: rentalId }),
-    })
-      .then(r => r.json())
-      .then(res => { if (res.success) refetch(); })
-      .catch(() => {});
-  };
-
-  const restoreRental = (rentalId) => {
-    fetch("rentals.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "restore", RentalID: rentalId }),
-    })
-      .then(r => r.json())
-      .then(res => { if (res.success) refetch(); })
-      .catch(() => {});
-  };
-
   return (
     <>
       <div className="pill-row" style={{justifyContent:"space-between", display:"flex", flexWrap:"wrap", gap:10}}>
@@ -978,34 +951,19 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
                 <td className="mono-cell">{r.ActualReturn ? fmtDate(r.ActualReturn) : "—"}</td>
                 <td>
                   {(() => {
-                    const isArchived = Number(r.Archived) === 1;
-                    const isOverdue  = !r.ActualReturn && !isArchived && new Date(r.ExpectedBack) < new Date();
-                    const label = isArchived ? "Archived" : r.ActualReturn ? "Returned" : isOverdue ? "Overdue" : "On loan";
-                    const tone  = isArchived ? "muted" : isOverdue ? "rose" : statusTone(r.ActualReturn ? "Done" : "Rented");
+                    const isOverdue = !r.ActualReturn && new Date(r.ExpectedBack) < new Date();
+                    const label = r.ActualReturn ? "Returned" : isOverdue ? "Overdue" : "On loan";
+                    const tone  = isOverdue ? "rose" : statusTone(r.ActualReturn ? "Done" : "Rented");
                     return <Chip tone={tone}>{label}</Chip>;
                   })()}
                 </td>
                 <td onClick={e => e.stopPropagation()}>
-                  {Number(r.Archived) === 1 ? (
-                    <span
-                      style={{fontSize:11.5, color:"var(--amber)", cursor:"pointer", fontWeight:600}}
-                      onClick={() => setConfirmRestoreRental(r.RentalID)}
-                    >
-                      Restore
-                    </span>
-                  ) : !r.ActualReturn ? (
+                  {!r.ActualReturn && (
                     <span
                       style={{fontSize:11.5, color:"var(--amber)", cursor:"pointer", fontWeight:600}}
                       onClick={() => { setReturningId(r.RentalID); setFormError(null); }}
                     >
                       Mark Returned
-                    </span>
-                  ) : (
-                    <span
-                      style={{fontSize:11.5, color:"var(--muted)", cursor:"pointer", fontWeight:600}}
-                      onClick={() => setConfirmArchiveRental(r.RentalID)}
-                    >
-                      Archive
                     </span>
                   )}
                 </td>
@@ -1071,27 +1029,7 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
           onCancel={() => setConfirmReturn(false)}
         />
       )}
-      {confirmArchiveRental && (
-        <ConfirmDialog
-          title="Archive Rental"
-          message={`Archive rental RNT-${confirmArchiveRental}? It will be hidden from the default view but can be restored.`}
-          confirmLabel="Archive"
-          confirmTone="rose"
-          onConfirm={() => { archiveRental(confirmArchiveRental); setConfirmArchiveRental(null); }}
-          onCancel={() => setConfirmArchiveRental(null)}
-        />
-      )}
-      {confirmRestoreRental && (
-        <ConfirmDialog
-          title="Restore Rental"
-          message={`Restore rental RNT-${confirmRestoreRental} back to the active view?`}
-          confirmLabel="Restore"
-          confirmTone="amber"
-          onConfirm={() => { restoreRental(confirmRestoreRental); setConfirmRestoreRental(null); }}
-          onCancel={() => setConfirmRestoreRental(null)}
-        />
-      )}
-    </>
+      </>
   );
 }
 

@@ -25,7 +25,7 @@ $stmt = $conn->prepare("
     SELECT r.RentalID,
            GROUP_CONCAT(i.ItemName SEPARATOR ', ') AS Item,
            GROUP_CONCAT(i.SerialNumber SEPARATOR ', ') AS Serials,
-           GROUP_CONCAT(CONCAT(i.ItemName, '<::>', i.SerialNumber) ORDER BY ri.RentalItemID SEPARATOR '<|>') AS ItemDetails,
+           JSON_ARRAYAGG(JSON_OBJECT('ItemName', i.ItemName, 'SerialNumber', i.SerialNumber)) AS ItemDetails,
            r.DateOut, r.ExpectedBack, r.ActualReturn,
            d.DepositID, d.AmountHeld, d.RefundStatus
     FROM Rentals r
@@ -40,6 +40,11 @@ $stmt->bind_param("i", $customerID);
 $stmt->execute();
 $rentals = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+
+foreach ($rentals as &$rental) {
+    $rental['ItemDetails'] = json_decode($rental['ItemDetails'], true);
+}
+unset($rental);
 
 // Available inventory count (public info)
 $result = $conn->query("SELECT COUNT(*) AS cnt FROM Inventory WHERE Status = 'Available' AND Archived = 0");

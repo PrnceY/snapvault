@@ -7,7 +7,7 @@ if ($method === 'GET') {
     $sql = "SELECT r.RentalID, r.CustomerID,
                CONCAT_WS(' ', c.FirstName, NULLIF(c.MiddleName,''), c.LastName) AS Customer,
                GROUP_CONCAT(i.ItemName SEPARATOR ', ') AS Item,
-               GROUP_CONCAT(CONCAT(i.ItemName, '<::>', i.SerialNumber) ORDER BY ri.RentalItemID SEPARATOR '<|>') AS ItemDetails,
+               JSON_ARRAYAGG(JSON_OBJECT('ItemName', i.ItemName, 'SerialNumber', i.SerialNumber)) AS ItemDetails,
                r.DateOut, r.ExpectedBack, r.ActualReturn, r.Status
         FROM Rentals r
         JOIN Customers c ON r.CustomerID = c.CustomerID
@@ -17,6 +17,7 @@ if ($method === 'GET') {
     $result = $conn->query($sql);
     $rows = [];
     while ($row = $result->fetch_assoc()) {
+        $row['ItemDetails'] = json_decode($row['ItemDetails'], true);
         $rows[] = $row;
     }
     echo json_encode($rows);

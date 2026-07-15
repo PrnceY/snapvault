@@ -977,16 +977,13 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
       {selectedRental && (
         <Modal title={`Rental RNT-${selectedRental.RentalID}`} onClose={() => setSelectedRental(null)}>
           <div style={{fontSize:11,color:"var(--muted)",textTransform:"uppercase",letterSpacing:0.5,marginBottom:8}}>Item(s) Rented</div>
-          {selectedRental.ItemDetails
-            ? selectedRental.ItemDetails.split("<|>").map((pair, idx, arr) => {
-                const [name, serial] = pair.split("<::>");
-                return (
-                  <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom: idx < arr.length - 1 ? "1px solid var(--line)" : "none"}}>
-                    <span style={{fontSize:13.5,fontWeight:500}}>{name}</span>
-                    <span style={{fontSize:11.5,color:"var(--amber)",fontFamily:"'IBM Plex Mono',monospace",background:"var(--card-hover)",padding:"2px 8px",borderRadius:6,flexShrink:0,marginLeft:10}}>{serial}</span>
-                  </div>
-                );
-              })
+          {selectedRental.ItemDetails && selectedRental.ItemDetails.length
+            ? selectedRental.ItemDetails.map((it, idx, arr) => (
+                <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom: idx < arr.length - 1 ? "1px solid var(--line)" : "none"}}>
+                  <span style={{fontSize:13.5,fontWeight:500}}>{it.ItemName}</span>
+                  <span style={{fontSize:11.5,color:"var(--amber)",fontFamily:"'IBM Plex Mono',monospace",background:"var(--card-hover)",padding:"2px 8px",borderRadius:6,flexShrink:0,marginLeft:10}}>{it.SerialNumber}</span>
+                </div>
+              ))
             : <div style={{fontSize:13.5}}>{selectedRental.Item}</div>
           }
           <div style={{display:"flex",gap:20,marginTop:16}}>

@@ -671,11 +671,6 @@ function CustomersPage({ data }) {
   const [form, setForm] = useState({ FirstName:"", MiddleName:"", LastName:"", IDType:"School ID", ContactNumber:"" });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
-  const [reviewing, setReviewing] = useState(null);
-  const [reviewSaving, setReviewSaving] = useState(false);
-  const [reviewError, setReviewError] = useState(null);
-  const [confirmApprove, setConfirmApprove] = useState(false);
-  const [confirmReject, setConfirmReject] = useState(false);
   const filters = ["All","Verified","Pending","Unverified"];
   const q = search.trim().toLowerCase();
   const rows = customers.filter(c => {
@@ -684,40 +679,6 @@ function CustomersPage({ data }) {
     const idStr = `cus-${String(c.CustomerID).padStart(3,"0")}`;
     return c.FullName.toLowerCase().includes(q) || idStr.includes(q) || String(c.CustomerID).includes(q);
   });
-
-  function approveId() {
-    setReviewSaving(true);
-    setReviewError(null);
-    fetch("customers.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "verify", CustomerID: reviewing.CustomerID }),
-    })
-      .then(r => r.json())
-      .then(res => {
-        setReviewSaving(false);
-        if (res.success) { setReviewing(null); refetch(); }
-        else setReviewError(res.error || "Could not verify customer.");
-      })
-      .catch(() => { setReviewSaving(false); setReviewError("Could not reach the server."); });
-  }
-
-  function rejectId() {
-    setReviewSaving(true);
-    setReviewError(null);
-    fetch("customers.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "reject", CustomerID: reviewing.CustomerID }),
-    })
-      .then(r => r.json())
-      .then(res => {
-        setReviewSaving(false);
-        if (res.success) { setReviewing(null); refetch(); }
-        else setReviewError(res.error || "Could not reject ID.");
-      })
-      .catch(() => { setReviewSaving(false); setReviewError("Could not reach the server."); });
-  }
 
   const submit = (e) => {
     e.preventDefault();
@@ -777,9 +738,7 @@ function CustomersPage({ data }) {
                 <td className="mono-cell">{c.ContactNumber}</td>
                 <td>
                   {c.VerificationStatus === "Pending" ? (
-                    <span onClick={() => setReviewing(c)} style={{cursor:"pointer"}}>
-                      <Chip tone="amber">Pending Review</Chip>
-                    </span>
+                    <Chip tone="amber">Pending Review</Chip>
                   ) : (
                     <Chip tone={c.VerificationStatus === "Verified" ? "green" : "rose"}>{c.VerificationStatus || "Unverified"}</Chip>
                   )}
@@ -789,50 +748,7 @@ function CustomersPage({ data }) {
           </tbody>
         </table>
       </Frame>
-
-      {reviewing && (
-        <Modal title={`Review ID — ${reviewing.FullName}`} onClose={() => { setReviewing(null); setReviewError(null); }}>
-          <div style={{fontSize:12.5,color:"var(--muted)",marginBottom:10}}>
-            CUS-{String(reviewing.CustomerID).padStart(3,"0")} · {reviewing.IDType}
-          </div>
-          <div style={{borderRadius:10,overflow:"hidden",border:"1px solid var(--line)",marginBottom:16,background:"var(--card-hover)"}}>
-            {reviewing.IDImagePath
-              ? <img src={reviewing.IDImagePath} alt="Submitted ID" style={{width:"100%",display:"block"}} />
-              : <div style={{padding:30,textAlign:"center",color:"var(--muted)",fontSize:12.5}}>No ID image on file.</div>
-            }
-          </div>
-          {reviewError && <p style={{color:"var(--rose)",fontSize:12.5,marginBottom:10}}>{reviewError}</p>}
-          <div style={{display:"flex",gap:10}}>
-            <button onClick={() => setConfirmReject(true)} disabled={reviewSaving} style={{flex:1,padding:"10px",borderRadius:9,border:"1px solid var(--rose)",background:"none",color:"var(--rose)",fontSize:13.5,fontWeight:600,cursor:"pointer"}}>
-              Reject
-            </button>
-            <button onClick={() => setConfirmApprove(true)} disabled={reviewSaving} style={{...buttonStyle,flex:1,marginTop:0}}>
-              {reviewSaving ? "Saving…" : "Approve & Verify"}
-            </button>
-          </div>
-        </Modal>
-      )}
-      {confirmApprove && (
-        <ConfirmDialog
-          title="Approve & Verify"
-          message={`Verify the government ID for ${reviewing?.FullName}? This will mark them as a verified customer.`}
-          confirmLabel="Approve & Verify"
-          confirmTone="green"
-          onConfirm={() => { setConfirmApprove(false); approveId(); }}
-          onCancel={() => setConfirmApprove(false)}
-        />
-      )}
-      {confirmReject && (
-        <ConfirmDialog
-          title="Reject ID"
-          message={`Reject the submitted ID for ${reviewing?.FullName}? Their verification status will be reset and the image removed.`}
-          confirmLabel="Reject"
-          confirmTone="rose"
-          onConfirm={() => { setConfirmReject(false); rejectId(); }}
-          onCancel={() => setConfirmReject(false)}
-        />
-      )}
-    </>
+      </>
   );
 }
 

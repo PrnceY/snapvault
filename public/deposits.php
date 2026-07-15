@@ -10,7 +10,8 @@ $sql = "SELECT d.DepositID, d.RentalID,
         JOIN Customers c ON c.CustomerID = r.CustomerID
         JOIN Rental_Items ri ON ri.RentalID = r.RentalID
         JOIN Inventory i ON i.InventoryID = ri.InventoryID
-        GROUP BY d.DepositID, d.RentalID, c.FirstName, c.MiddleName, c.LastName, d.AmountHeld, d.RefundStatus";
+        GROUP BY d.DepositID, d.RentalID, c.FirstName, c.MiddleName, c.LastName, d.AmountHeld, d.RefundStatus
+        ORDER BY d.DepositID DESC";
 $result = $conn->query($sql);
 
 $rows = [];

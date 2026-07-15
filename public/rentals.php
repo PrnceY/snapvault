@@ -13,7 +13,8 @@ if ($method === 'GET') {
         JOIN Customers c ON r.CustomerID = c.CustomerID
         JOIN Rental_Items ri ON ri.RentalID = r.RentalID
         JOIN Inventory i ON i.InventoryID = ri.InventoryID
-        GROUP BY r.RentalID, r.CustomerID, c.FirstName, c.MiddleName, c.LastName, r.DateOut, r.ExpectedBack, r.ActualReturn, r.Status";
+        GROUP BY r.RentalID, r.CustomerID, c.FirstName, c.MiddleName, c.LastName, r.DateOut, r.ExpectedBack, r.ActualReturn, r.Status
+        ORDER BY r.RentalID DESC";
     $result = $conn->query($sql);
     $rows = [];
     while ($row = $result->fetch_assoc()) {

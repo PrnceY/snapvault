@@ -8,7 +8,8 @@ if ($method === 'GET') {
     $sql = "SELECT CustomerID, FirstName, MiddleName, LastName,
                CONCAT_WS(' ', FirstName, NULLIF(MiddleName,''), LastName) AS FullName,
                IDType, ContactNumber, IDImagePath, VerificationStatus
-        FROM Customers";
+        FROM Customers
+        ORDER BY CustomerID DESC";
     $result = $conn->query($sql);
     $rows = [];
     while ($row = $result->fetch_assoc()) {

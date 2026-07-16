@@ -488,7 +488,7 @@ function CustomerApp() {
           )}
 
           {!loading && page === 'catalog'   && <CustomerCatalog data={{inventory, categories: custCategories}} onRent={(item) => { setPreselectItems([item]); setPage('rent'); }} cartItems={cartItems} onToggleCart={toggleCart} />}
-          {!loading && page === 'compat'    && <CustomerCompat  data={{inventory}} />}
+          {!loading && page === 'compat'    && <CustomerCompat  data={{inventory}} cartItems={cartItems} onToggleCart={toggleCart} />}
           {!loading && page === 'rent'      && <CustomerRent    data={{inventory, categories: custCategories}} profile={profile} onSuccess={() => setPage('dashboard')} refetch={() => fetch('customer_data.php').then(r=>r.json()).then(d=>{setRentals(d.rentals||[]);setAvailable(d.availableCount||0);})} preselectItems={preselectItems} onConsumePreselect={() => setPreselectItems([])} clearCart={clearCart} />}
             {!loading && page === 'profile'   && <CustomerProfile profile={profile} rentals={rentals} onProfileUpdated={() => fetch('customer_data.php').then(r=>r.json()).then(d=>{setProfile(d.customer);setRentals(d.rentals||[]);setAvailable(d.availableCount||0);})} />}
         </main>
@@ -708,7 +708,7 @@ function CustomerCatalog({ data, onRent, cartItems, onToggleCart }) {
 }
 
 /* ── 2. Compatibility Checker ── */
-function CustomerCompat({ data }) {
+function CustomerCompat({ data, cartItems, onToggleCart }) {
   const { inventory } = data;
   const bodies  = inventory.filter(i => i.CategoryName === 'Camera Bodies' && !Number(i.Archived));
   const lenses  = inventory.filter(i => i.CategoryName === 'Lenses'        && !Number(i.Archived));
@@ -727,6 +727,7 @@ function CustomerCompat({ data }) {
     : [];
 
   const availTone = s => s === 'Available' ? 'green' : s === 'Rented' ? 'amber' : 'rose';
+  const isInCart  = item => (cartItems || []).some(c => c.SerialNumber === item.SerialNumber);
 
   return (
     <div style={{maxWidth:780}}>
@@ -763,16 +764,40 @@ function CustomerCompat({ data }) {
 
       {resultItems.length > 0 && (
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
-          {resultItems.map(item=>(
-            <div key={item.SerialNumber} style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:'16px'}}>
-              <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{item.ItemName}</div>
-              <div style={{fontSize:11.5,color:'var(--muted)',marginBottom:10}}>{item.CategoryName}</div>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:'var(--amber)'}}>₱{getRentalRate(item).toLocaleString()}/day</span>
-                <Chip tone={availTone(item.Status)}>{item.Status}</Chip>
+          {resultItems.map(item=>{
+            const inCart = isInCart(item);
+            const canAdd = item.Status === 'Available';
+            return (
+              <div key={item.SerialNumber} style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:'16px'}}>
+                <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{item.ItemName}</div>
+                <div style={{fontSize:11.5,color:'var(--muted)',marginBottom:10}}>{item.CategoryName}</div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                  <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:'var(--amber)'}}>₱{getRentalRate(item).toLocaleString()}/day</span>
+                  <Chip tone={availTone(item.Status)}>{item.Status}</Chip>
+                </div>
+                <button
+                  onClick={() => canAdd && onToggleCart && onToggleCart(item)}
+                  disabled={!canAdd}
+                  title={inCart ? 'Remove from cart' : 'Add to cart'}
+                  style={{
+                    width:'100%', padding:'7px 0', borderRadius:8, border:'1px solid var(--line)',
+                    background: inCart ? 'var(--amber)' : 'var(--card-hover)',
+                    color: inCart ? '#1A1320' : 'var(--text)',
+                    cursor: canAdd ? 'pointer' : 'default',
+                    opacity: canAdd ? 1 : 0.4,
+                    fontSize:12, fontWeight:600,
+                    display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill={inCart ? '#1A1320' : 'none'} stroke="currentColor" strokeWidth="1.7">
+                    <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                  </svg>
+                  {inCart ? 'In Cart' : 'Add to Cart'}
+                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

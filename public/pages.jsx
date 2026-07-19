@@ -671,14 +671,19 @@ function CustomersPage({ data }) {
   const [form, setForm] = useState({ FirstName:"", MiddleName:"", LastName:"", IDType:"School ID", ContactNumber:"" });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 15;
   const filters = ["All","Verified","Pending","Unverified"];
   const q = search.trim().toLowerCase();
+  useEffect(() => { setPage(1); }, [filter, search]);
   const rows = customers.filter(c => {
     if (filter !== "All" && (c.VerificationStatus || "Unverified") !== filter) return false;
     if (!q) return true;
     const idStr = `cus-${String(c.CustomerID).padStart(3,"0")}`;
     return c.FullName.toLowerCase().includes(q) || idStr.includes(q) || String(c.CustomerID).includes(q);
-  });
+  }).sort((a, b) => b.CustomerID - a.CustomerID);
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pageItems = rows.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const submit = (e) => {
     e.preventDefault();
@@ -729,7 +734,7 @@ function CustomersPage({ data }) {
             {rows.length === 0 && (
               <tr><td colSpan="6" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No customers match your search.</td></tr>
             )}
-            {rows.map(c => (
+            {pageItems.map(c => (
               <tr key={c.CustomerID}>
                 <td className="mono-cell">CUS-{String(c.CustomerID).padStart(3,"0")}</td>
                 <td className="empty-name">{c.FirstName}</td>
@@ -748,6 +753,18 @@ function CustomersPage({ data }) {
           </tbody>
         </table>
       </Frame>
+      {rows.length > 0 && (
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:14}}>
+          <span style={{fontSize:12, color:"var(--muted)"}}>
+            Showing {(page-1)*PAGE_SIZE+1}–{Math.min(page*PAGE_SIZE, rows.length)} of {rows.length}
+          </span>
+          <div style={{display:"flex", gap:8}}>
+            <button disabled={page===1} onClick={() => setPage(p => p-1)} style={{...buttonStyle, width:"auto", padding:"7px 14px", marginTop:0, opacity: page===1?0.4:1, cursor: page===1?"default":"pointer"}}>Prev</button>
+            <span style={{fontSize:12.5, color:"var(--muted)", alignSelf:"center"}}>Page {page} of {totalPages}</span>
+            <button disabled={page===totalPages} onClick={() => setPage(p => p+1)} style={{...buttonStyle, width:"auto", padding:"7px 14px", marginTop:0, opacity: page===totalPages?0.4:1, cursor: page===totalPages?"default":"pointer"}}>Next</button>
+          </div>
+        </div>
+      )}
       </>
   );
 }
@@ -763,10 +780,13 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
   const [confirmReturn, setConfirmReturn] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedRental, setSelectedRental] = useState(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 15;
   const filters = ["All","On Loan","Returned"];
 
   const availableItems = inventory.filter(i => i.Status === "Available");
   const q = search.trim().toLowerCase();
+  useEffect(() => { setPage(1); }, [rentalFilter, search]);
   const rows = rentals.filter(r => {
     if (rentalFilter !== "All" && !(rentalFilter === "On Loan" ? !r.ActualReturn : !!r.ActualReturn)) {
       return false;
@@ -775,7 +795,9 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
     return String(r.RentalID).includes(q) ||
       r.Customer.toLowerCase().includes(q) ||
       r.Item.toLowerCase().includes(q);
-  });
+  }).sort((a, b) => b.RentalID - a.RentalID);
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pageItems = rows.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const submitRental = (e) => {
     e.preventDefault();
@@ -847,7 +869,7 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
             {rows.length === 0 && (
               <tr><td colSpan="9" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No rentals match your search.</td></tr>
             )}
-            {rows.map(r => {
+            {pageItems.map(r => {
               const itemNames = r.Item.split(", ");
               return (
               <tr key={r.RentalID} className="row-clickable" onClick={() => setSelectedRental(r)}>
@@ -889,6 +911,18 @@ function RentalsPage({ data, rentalFilter, setRentalFilter }) {
           </tbody>
         </table>
       </Frame>
+      {rows.length > 0 && (
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:14}}>
+          <span style={{fontSize:12, color:"var(--muted)"}}>
+            Showing {(page-1)*PAGE_SIZE+1}–{Math.min(page*PAGE_SIZE, rows.length)} of {rows.length}
+          </span>
+          <div style={{display:"flex", gap:8}}>
+            <button disabled={page===1} onClick={() => setPage(p => p-1)} style={{...buttonStyle, width:"auto", padding:"7px 14px", marginTop:0, opacity: page===1?0.4:1, cursor: page===1?"default":"pointer"}}>Prev</button>
+            <span style={{fontSize:12.5, color:"var(--muted)", alignSelf:"center"}}>Page {page} of {totalPages}</span>
+            <button disabled={page===totalPages} onClick={() => setPage(p => p+1)} style={{...buttonStyle, width:"auto", padding:"7px 14px", marginTop:0, opacity: page===totalPages?0.4:1, cursor: page===totalPages?"default":"pointer"}}>Next</button>
+          </div>
+        </div>
+      )}
 
       {selectedRental && (
         <Modal title={`Rental RNT-${selectedRental.RentalID}`} onClose={() => setSelectedRental(null)}>
@@ -950,8 +984,11 @@ function DepositsPage({ data }) {
   const { deposits } = data;
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 15;
   const filters = ["All","Held","Full Refund","Partial Refund","Forfeited"];
   const q = search.trim().toLowerCase();
+  useEffect(() => { setPage(1); }, [filter, search]);
   const rows = deposits.filter(d => {
     if (filter !== "All" && d.RefundStatus !== filter) return false;
     if (!q) return true;
@@ -959,7 +996,9 @@ function DepositsPage({ data }) {
       String(d.RentalID).includes(q) ||
       (d.Customer || "").toLowerCase().includes(q) ||
       (d.Item || "").toLowerCase().includes(q);
-  });
+  }).sort((a, b) => b.DepositID - a.DepositID);
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pageItems = rows.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   return (
     <>
@@ -983,7 +1022,7 @@ function DepositsPage({ data }) {
             {rows.length === 0 && (
               <tr><td colSpan="5" style={{color:"var(--muted)",textAlign:"center",padding:24}}>No deposits match your search.</td></tr>
             )}
-            {rows.map(d => (
+            {pageItems.map(d => (
               <tr key={d.DepositID}>
                 <td className="mono-cell">DEP-{d.DepositID}</td>
                 <td className="mono-cell">RNT-{d.RentalID}</td>
@@ -995,6 +1034,18 @@ function DepositsPage({ data }) {
           </tbody>
         </table>
       </Frame>
+      {rows.length > 0 && (
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:14}}>
+          <span style={{fontSize:12, color:"var(--muted)"}}>
+            Showing {(page-1)*PAGE_SIZE+1}–{Math.min(page*PAGE_SIZE, rows.length)} of {rows.length}
+          </span>
+          <div style={{display:"flex", gap:8}}>
+            <button disabled={page===1} onClick={() => setPage(p => p-1)} style={{...buttonStyle, width:"auto", padding:"7px 14px", marginTop:0, opacity: page===1?0.4:1, cursor: page===1?"default":"pointer"}}>Prev</button>
+            <span style={{fontSize:12.5, color:"var(--muted)", alignSelf:"center"}}>Page {page} of {totalPages}</span>
+            <button disabled={page===totalPages} onClick={() => setPage(p => p+1)} style={{...buttonStyle, width:"auto", padding:"7px 14px", marginTop:0, opacity: page===totalPages?0.4:1, cursor: page===totalPages?"default":"pointer"}}>Next</button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

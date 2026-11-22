@@ -20,7 +20,7 @@ function App() {
   const Page = pages[page];
   const meta = pageMeta[page];
 
-  return (
+  return ( 
     <div className="app">
       <aside className={`sidebar ${mobileNavOpen ? "open" : ""}`}>
         <div className="brand">

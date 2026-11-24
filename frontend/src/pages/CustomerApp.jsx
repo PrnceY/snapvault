@@ -1,0 +1,1336 @@
+import { Fragment, useState, useEffect } from "react";
+import { Chip, Frame, Modal, FormField, SearchableSelect, inputStyle, buttonStyle, ApertureIcon, icons, fmtDate, ConfirmDialog } from "../shared.jsx";
+import "../styles.css";
+import "./customer.css";
+
+
+function getInitials(name) {
+  if (!name) return '?'
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+export default function CustomerApp() {
+  const [page, setPage]         = useState('dashboard');
+  const [profile, setProfile]   = useState(null);
+  const [rentals, setRentals]   = useState([]);
+  const [available, setAvailable]   = useState(0);
+  const [inventory, setInventory]   = useState([]);
+  const [custCategories, setCustCategories] = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [preselectItems, setPreselectItems] = useState([]);
+  const [cartItems, setCartItems]   = useState([]);
+  const [showCart, setShowCart]     = useState(false);
+  const [cartCatFilter, setCartCatFilter] = useState('All');
+  const refetchCart = () => fetch('/api/cart').then(r => r.json()).then(d => setCartItems(Array.isArray(d) ? d : []));
+
+  useEffect(() => {
+    Promise.all([
+        fetch('/api/customer_data').then(r => r.json()),
+        fetch('/api/inventory').then(r => r.json()),
+        fetch('/api/categories').then(r => r.json()),
+        fetch('/api/cart').then(r => r.json()),
+      ]).then(([d, inv, cats, cart]) => {
+        setProfile(d.customer);
+        setRentals(d.rentals || []);
+        setAvailable(d.availableCount || 0);
+        setInventory(Array.isArray(inv) ? inv.filter(i => Number(i.Archived) === 0) : []);
+        setCustCategories(Array.isArray(cats) ? cats : []);
+        setCartItems(Array.isArray(cart) ? cart : []);
+        setLoading(false);
+      }).catch(err => {
+        console.error('Customer data load failed:', err);
+        setLoading(false);
+      });
+  }, []);
+
+  function toggleCart(item) {
+    const already = cartItems.some(c => c.SerialNumber === item.SerialNumber);
+    fetch('/api/cart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: already ? 'remove' : 'add', SerialNumber: item.SerialNumber }),
+    }).then(r => r.json()).then(() => refetchCart());
+  }
+
+  function clearCart() {
+    fetch('/api/cart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'clear' }) })
+      .then(() => setCartItems([]));
+  }
+
+  const activeRentals   = rentals.filter(r => !r.ActualReturn);
+  const depositOnHold   = rentals.reduce((s, r) => s + (r.ActualReturn ? 0 : parseFloat(r.AmountHeld || 0)), 0);
+
+  // Upcoming returns: active rentals due within 7 days
+  const now = new Date();
+  const upcomingReturns = activeRentals.filter(r => {
+    const due = new Date(r.ExpectedBack);
+    const diff = (due - now) / 86400000;
+    return diff >= 0 && diff <= 7;
+  });
+
+  // Build a persistent notification feed from rental/deposit state, newest first.
+  // Unlike a live filter over activeRentals, this keeps a record for every
+  // rental regardless of whether it has since been marked returned.
+  function notifTone(status) {
+    if (status === 'Full Refund') return 'blue';
+    if (status === 'Partial Refund') return 'amber';
+    if (status === 'Forfeited') return 'rose';
+    return 'muted';
+  }
+  function notifLabel(r) {
+    const amt = parseFloat(r.AmountHeld || 0).toLocaleString();
+    if (r.RefundStatus === 'Full Refund')   return `Deposit ₱${amt} refunded for completed rental ID ${r.RentalID}`;
+    if (r.RefundStatus === 'Partial Refund') return `Partial deposit ₱${amt} refunded for rental ID ${r.RentalID}`;
+    if (r.RefundStatus === 'Forfeited')      return `Deposit ₱${amt} forfeited for rental ID ${r.RentalID}`;
+    return `Rental ID ${r.RentalID} returned — deposit review pending`;
+  }
+
+  const allNotifications = rentals.flatMap(r => {
+    const items = [];
+    if (!r.ActualReturn) {
+      items.push({
+        id: 'active-'+r.RentalID, tone: 'green', date: new Date(r.DateOut),
+        text: `Rental ID ${r.RentalID} active — ${r.Item} currently out`,
+        time: `Due back: ${fmtDate(r.ExpectedBack)}`,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+      });
+      const due = new Date(r.ExpectedBack);
+      const diff = (due - now) / 86400000;
+      if (diff >= 0 && diff <= 7) {
+        items.push({
+          id: 'due-'+r.RentalID, tone: 'amber', date: due,
+          text: `Return reminder: ${r.Item} is due back on ${due.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`,
+          time: fmtDate(r.ExpectedBack),
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+        });
+      }
+    } else {
+      items.push({
+        id: 'ret-'+r.RentalID, tone: notifTone(r.RefundStatus), date: new Date(r.ActualReturn),
+        text: notifLabel(r),
+        time: fmtDate(r.ActualReturn),
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>,
+      });
+    }
+    return items;
+  }).sort((a,b) => b.date - a.date);
+
+  const [showAllNotifs, setShowAllNotifs] = useState(false);
+  const [showAllRentals, setShowAllRentals] = useState(false);
+
+  const initials   = getInitials(profile?.FullName);
+  const today      = now.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  const firstName  = profile?.FullName?.split(' ')[0] || 'there';
+
+  const navItems = [
+    { key: 'dashboard', label: 'Dashboard',             icon: icons.dashboard },
+    { key: 'catalog',   label: 'Equipment Catalog',     icon: icons.inventory },
+    { key: 'compat',    label: 'Compatibility Checker', icon: icons.compatibility },
+    { key: 'rent',      label: 'Rent Equipment',        icon: icons.rentals },
+    { key: 'profile',   label: 'My Profile',            icon: icons.customers },
+  ];
+
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  function signOut() {
+    fetch('/api/logout', { method: 'POST' }).finally(() => { window.location.href = '/'; });
+  }
+
+  return (
+    <div className="app">
+      {/* ── Sidebar ── */}
+      <aside className={`sidebar ${mobileNavOpen ? "open" : ""}`}>
+        <div className="brand" style={{padding:'0 12px 0 12px', marginBottom:0, border:'none'}}>
+          <div className="brand-mark"><ApertureIcon /></div>
+          <div className="brand-text">
+            <span className="name">SnapVault</span>
+            <span className="sub">CUSTOMER PORTAL</span>
+          </div>
+        </div>
+
+        {profile && (
+          <div className="sidebar-profile">
+            <div className="profile-avatar">{initials}</div>
+            <div>
+              <div className="profile-name">{profile.FullName}</div>
+              <div className="profile-badge">C-{String(profile.CustomerID).padStart(3,'0')} · {profile.Verified ? 'Verified' : 'Unverified'}</div>
+            </div>
+          </div>
+        )}
+
+        <nav className="nav">
+          {navItems.map(n => (
+            <div key={n.key} className={`nav-item ${page===n.key?'active':''}`} onClick={() => { setPage(n.key); setMobileNavOpen(false); }}>
+              <span className="dot"></span>
+              <span className="icon">{n.icon}</span>
+              {n.label}
+            </div>
+          ))}
+        </nav>
+
+        <div className="sidebar-signout">
+          <button className="signout-btn" onClick={() => setConfirmSignOut(true)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {mobileNavOpen && <div className="sidebar-overlay" onClick={() => setMobileNavOpen(false)}></div>}
+
+      {confirmSignOut && (
+        <ConfirmDialog
+          title="Sign Out"
+          message="Are you sure you want to sign out of SnapVault?"
+          confirmLabel="Sign Out"
+          confirmTone="rose"
+          onConfirm={signOut}
+          onCancel={() => setConfirmSignOut(false)}
+        />
+      )}
+      {showCart && (
+        <Modal title="Your Cart" onClose={() => setShowCart(false)} width={440}>
+          {cartItems.length === 0 ? (
+            <p style={{color:'var(--muted)',fontSize:13}}>Your cart is empty. Browse the catalog to add equipment.</p>
+          ) : (
+            <>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>
+                {['All', ...new Set(cartItems.map(i => i.CategoryName))].map(cat => (
+                  <span
+                    key={cat}
+                    onClick={() => setCartCatFilter(cat)}
+                    style={{
+                      padding:'5px 11px', borderRadius:100, fontSize:11.5, fontWeight:500, cursor:'pointer',
+                      border:'1px solid var(--line)',
+                      color: cartCatFilter===cat ? '#1A1320' : 'var(--muted)',
+                      background: cartCatFilter===cat ? 'var(--amber)' : 'var(--card-hover)',
+                    }}
+                  >{cat}</span>
+                ))}
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:16,maxHeight:340,overflowY:'auto'}}>
+                {cartItems
+                  .filter(item => cartCatFilter === 'All' || item.CategoryName === cartCatFilter)
+                  .map(item => (
+                    <div key={item.CartID} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid var(--line)'}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:600}}>{item.ItemName}</div>
+                        <div style={{fontSize:11,color:'var(--muted)'}}>{item.CategoryName} · ₱{getRentalRate(item).toLocaleString()}/day</div>
+                      </div>
+                      <span onClick={() => toggleCart(item)} style={{cursor:'pointer',color:'var(--rose)',fontSize:12,fontWeight:600,flexShrink:0}}>Remove</span>
+                    </div>
+                  ))}
+              </div>
+              <button style={buttonStyle} onClick={() => { setPreselectItems(cartItems); setShowCart(false); setPage('rent'); }}>
+                Proceed to Rent ({cartItems.length})
+              </button>
+            </>
+          )}
+        </Modal>
+      )}
+      {/* ── Main ── */}
+      <div className="main">
+        {/* Topbar */}
+        <div className="topbar">
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <button className="mobile-menu-btn" onClick={() => setMobileNavOpen(true)} aria-label="Open menu">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+            <div className="topbar-left">
+              <div className="topbar-title">{navItems.find(n => n.key === page)?.label || 'Dashboard'}</div>
+              <div className="topbar-sub">{today} · Welcome {firstName}</div>
+            </div>
+          </div>
+          <div className="topbar-right">
+            <button className="notif-btn" onClick={() => { setCartCatFilter('All'); setShowCart(true); }} aria-label="Cart">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+              </svg>
+              {cartItems.length > 0 && (
+                <span style={{position:'absolute',top:-5,right:-5,minWidth:16,height:16,padding:'0 3px',borderRadius:8,background:'var(--amber)',color:'#1A1320',fontSize:9.5,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {cartItems.length > 9 ? '9+' : cartItems.length}
+                </span>
+              )}
+            </button>
+            <div className="avatar">{initials}</div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <main className="content">
+          {loading && <p style={{color:'var(--muted)'}}>Loading your data…</p>}
+          {!loading && page === 'dashboard' && (
+            <>
+              {/* Stat cards */}
+              <div className="cust-cards">
+                <div className="stat-card clickable" onClick={() => setPage('profile')}>
+                  <div className="top">
+                    <div className="lab" style={{fontSize:12,color:'var(--muted)'}}>Active Rentals</div>
+                    <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg></div>
+                  </div>
+                  <div className="num">{activeRentals.length}</div>
+                  <div className="lab">Currently out</div>
+                </div>
+                <div className="stat-card clickable" onClick={() => setPage('profile')}>
+                  <div className="top">
+                    <div className="lab" style={{fontSize:12,color:'var(--muted)'}}>Upcoming Returns</div>
+                    <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+                  </div>
+                  <div className="num">{upcomingReturns.length}</div>
+                  <div className="lab">Due this week</div>
+                </div>
+                <div className="stat-card clickable" onClick={() => setPage('profile')}>
+                  <div className="top">
+                    <div className="lab" style={{fontSize:12,color:'var(--muted)'}}>Deposit on Hold</div>
+                    <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="7.5" cy="14.5" r="1"/></svg></div>
+                  </div>
+                  <div className="num" style={{fontSize:22}}>₱{depositOnHold.toLocaleString()}</div>
+                  <div className="lab">Across {activeRentals.length} rental{activeRentals.length!==1?'s':''}</div>
+                </div>
+                <div className="stat-card clickable" onClick={() => setPage('catalog')}>
+                  <div className="top">
+                    <div className="lab" style={{fontSize:12,color:'var(--muted)'}}>Available Items</div>
+                    <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                  </div>
+                  <div className="num">{available}</div>
+                  <div className="lab">Ready to rent</div>
+                </div>
+              </div>
+
+              {/* Notifications */}
+              <div style={{marginBottom:22}}>
+                <div className="section-head">
+                  <h2>Notifications</h2>
+                  {allNotifications.length > 5 && (
+                    <span onClick={() => setShowAllNotifs(true)} style={{fontSize:12,color:'var(--amber)',cursor:'pointer',fontWeight:600}}>View All</span>
+                  )}
+                </div>
+                <Frame>
+                  <div className="notif-list">
+                    {allNotifications.length === 0 ? (
+                      <div className="notif-item"><span style={{color:'var(--muted)',fontSize:13}}>No recent notifications.</span></div>
+                    ) : (
+                      allNotifications.slice(0,5).map(n => (
+                        <div className="notif-item" key={n.id}>
+                          <div className={`notif-icon ${n.tone}`}>{n.icon}</div>
+                          <div>
+                            <div className="notif-text">{n.text}</div>
+                            <div className="notif-time">{n.time}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </Frame>
+              </div>
+
+              {showAllNotifs && (
+                <Modal title="All Notifications" onClose={() => setShowAllNotifs(false)} width={480}>
+                  <div className="notif-list" style={{maxHeight:420,overflowY:'auto'}}>
+                    {allNotifications.length === 0 ? (
+                      <div className="notif-item"><span style={{color:'var(--muted)',fontSize:13}}>No notifications yet.</span></div>
+                    ) : (
+                      allNotifications.map(n => (
+                        <div className="notif-item" key={n.id}>
+                          <div className={`notif-icon ${n.tone}`}>{n.icon}</div>
+                          <div>
+                            <div className="notif-text">{n.text}</div>
+                            <div className="notif-time">{n.time}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </Modal>
+              )}
+
+              {/* Recent Rental Activity */}
+              <div>
+                <div className="section-head">
+                  <h2>Recent Rental Activity</h2>
+                  {rentals.length > 5 && (
+                    <span onClick={() => setShowAllRentals(true)} style={{fontSize:12,color:'var(--amber)',cursor:'pointer',fontWeight:600}}>View All</span>
+                  )}
+                </div>
+                <Frame>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Rental ID</th>
+                        <th>Equipment</th>
+                        <th>Rental Date</th>
+                        <th>Return Date</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rentals.length === 0 && (
+                        <tr><td colSpan="5" style={{color:'var(--muted)',textAlign:'center',padding:24}}>No rentals yet.</td></tr>
+                      )}
+                      {rentals.slice(0,5).map(r => {
+                        const status = r.ActualReturn ? 'Returned' : (new Date(r.ExpectedBack) < now ? 'Overdue' : 'Active');
+                        const tone   = status==='Active'?'green':status==='Overdue'?'rose':'muted';
+                        return (
+                          <tr key={r.RentalID}>
+                            <td><span style={{color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12}}>RNT-{r.RentalID}</span></td>
+                            <td>{r.Item}</td>
+                            <td className="mono-cell">{fmtDate(r.DateOut)}</td>
+                            <td className="mono-cell">{fmtDate(r.ExpectedBack)}</td>
+                            <td><Chip tone={tone}>{status}</Chip></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </Frame>
+              </div>
+
+              {showAllRentals && (
+                <Modal title="All Rental Activity" onClose={() => setShowAllRentals(false)} width={640}>
+                  <div style={{maxHeight:420,overflowY:'auto'}}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Rental ID</th>
+                          <th>Equipment</th>
+                          <th>Rental Date</th>
+                          <th>Return Date</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rentals.map(r => {
+                          const status = r.ActualReturn ? 'Returned' : (new Date(r.ExpectedBack) < now ? 'Overdue' : 'Active');
+                          const tone   = status==='Active'?'green':status==='Overdue'?'rose':'muted';
+                          return (
+                            <tr key={r.RentalID}>
+                              <td><span style={{color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12}}>RNT-{r.RentalID}</span></td>
+                              <td>{r.Item}</td>
+                              <td className="mono-cell">{fmtDate(r.DateOut)}</td>
+                              <td className="mono-cell">{fmtDate(r.ExpectedBack)}</td>
+                              <td><Chip tone={tone}>{status}</Chip></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Modal>
+              )}
+            </>
+          )}
+
+          {!loading && page === 'catalog'   && <CustomerCatalog data={{inventory, categories: custCategories}} onRent={(item) => { setPreselectItems([item]); setPage('rent'); }} cartItems={cartItems} onToggleCart={toggleCart} />}
+          {!loading && page === 'compat'    && <CustomerCompat  data={{inventory}} cartItems={cartItems} onToggleCart={toggleCart} />}
+          {!loading && page === 'rent'      && <CustomerRent    data={{inventory, categories: custCategories}} profile={profile} onSuccess={() => setPage('dashboard')} refetch={() => fetch('/api/customer_data').then(r=>r.json()).then(d=>{setRentals(d.rentals||[]);setAvailable(d.availableCount||0);})} preselectItems={preselectItems} onConsumePreselect={() => setPreselectItems([])} clearCart={clearCart} />}
+            {!loading && page === 'profile'   && <CustomerProfile profile={profile} rentals={rentals} onProfileUpdated={() => fetch('/api/customer_data').then(r=>r.json()).then(d=>{setProfile(d.customer);setRentals(d.rentals||[]);setAvailable(d.availableCount||0);})} />}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/* ── Rental rate — read directly from DB value ── */
+function getRentalRate(item) {
+  return Number(item.RentalRate) || 0;
+}
+
+function getBrand(name) {
+  const l = name.toLowerCase();
+  if (l.startsWith('canon'))    return 'Canon';
+  if (l.startsWith('sony'))     return 'Sony';
+  if (l.startsWith('nikon'))    return 'Nikon';
+  if (l.startsWith('fuji'))     return 'Fujifilm';
+  if (l.startsWith('sigma'))    return 'Sigma';
+  if (l.startsWith('godox'))    return 'Godox';
+  if (l.startsWith('profoto'))  return 'Profoto';
+  if (l.startsWith('manfrotto'))return 'Manfrotto';
+  if (l.startsWith('gitzo'))    return 'Gitzo';
+  return 'Other';
+}
+
+/* ── 1. Equipment Catalog ── */
+function CustomerCatalog({ data, onRent, cartItems, onToggleCart }) {
+  const { inventory, categories } = data;
+  const [search, setSearch]         = useState('');
+  const [catFilter, setCatFilter]   = useState('All');
+  const [availFilter, setAvailFilter] = useState('All');
+  const [brandFilter, setBrandFilter] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const PAGE_SIZE = 9; // 3-column grid, so 3 rows per page
+
+  const brands = [...new Set(inventory.map(i => getBrand(i.ItemName)))]
+    .sort((a, b) => a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b));
+
+  const filtered = inventory.filter(i => {
+    if (catFilter !== 'All'   && i.CategoryName !== catFilter) return false;
+    if (availFilter !== 'All' && i.Status !== availFilter)     return false;
+    if (brandFilter !== 'All' && getBrand(i.ItemName) !== brandFilter) return false;
+    if (search && !i.ItemName.toLowerCase().includes(search.toLowerCase()) && !i.SerialNumber.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const condTone = c => c === 'Excellent' ? 'green' : c === 'Good' ? 'amber' : 'rose';
+  const availTone = s => s === 'Available' ? 'green' : s === 'Rented' ? 'amber' : 'rose';
+  const isInCart = item => (cartItems || []).some(c => c.SerialNumber === item.SerialNumber);
+
+  const sideLabel = { fontSize:10, color:'var(--muted)', fontFamily:"'IBM Plex Mono',monospace", letterSpacing:0.8, textTransform:'uppercase', marginBottom:10, marginTop:18 };
+  const filterLink = (active, onClick, label) => (
+    <div onClick={onClick} style={{ fontSize:13, cursor:'pointer', color: active ? 'var(--amber)' : 'var(--muted)', fontWeight: active ? 600 : 400, padding:'3px 0', transition:'color .15s' }}>{label}</div>
+  );
+
+  return (
+    <div style={{display:'flex', gap:0, minHeight:'100%'}}>
+      {/* Sidebar filters */}
+      <div style={{width:160, flexShrink:0, paddingRight:24}}>
+        <div style={sideLabel}>Category</div>
+        {filterLink(catFilter==='All', ()=>{ setCatFilter('All'); setCurrentPage(1); }, 'All')}
+        {categories.map(c => filterLink(catFilter===c.CategoryName, ()=>{ setCatFilter(c.CategoryName); setCurrentPage(1); }, c.CategoryName))}
+        <div style={sideLabel}>Availability</div>
+        {['All','Available','Rented','Maintenance'].map(s => filterLink(availFilter===s, ()=>{ setAvailFilter(s); setCurrentPage(1); }, s))}
+        <div style={sideLabel}>Brand</div>
+        {filterLink(brandFilter==='All', ()=>{ setBrandFilter('All'); setCurrentPage(1); }, 'All')}
+        {brands.map(b => filterLink(brandFilter===b, ()=>{ setBrandFilter(b); setCurrentPage(1); }, b))}
+      </div>
+
+      {/* Main grid */}
+      <div style={{flex:1, minWidth:0}}>
+        <div style={{position:'relative', marginBottom:18}}>
+          <svg style={{position:'absolute',left:13,top:'50%',transform:'translateY(-50%)',width:15,height:15,color:'var(--muted)'}} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input value={search} onChange={e=>{ setSearch(e.target.value); setCurrentPage(1); }} placeholder="Search equipment…" style={{...inputStyle, paddingLeft:38, width:'100%'}} />
+          </div>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14}}>
+          {pageItems.map(item => (
+            <div key={item.SerialNumber} style={{background:'var(--card)', border:'1px solid var(--line)', borderRadius:14, overflow:'hidden', transition:'border-color .2s, transform .2s', cursor:'pointer'}}
+              onClick={() => setSelectedItem(item)}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(255,180,84,0.4)';e.currentTarget.style.transform='translateY(-2px)';}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--line)';e.currentTarget.style.transform='none';}}
+            >
+              <div style={{height:160, background:'var(--card-hover)', overflow:'hidden', position:'relative'}}>
+                {item.ImagePath
+                  ? <img src={item.ImagePath} alt={item.ItemName} style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                  : <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--muted)',opacity:0.3}}>
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><circle cx="12" cy="13" r="2.5"/></svg>
+                    </div>
+                }
+                <div style={{position:'absolute',top:10,right:10}}><Chip tone={availTone(item.Status)}>{item.Status}</Chip></div>
+              </div>
+              <div style={{padding:'14px 16px'}}>
+                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:14,marginBottom:3}}>{item.ItemName}</div>
+                <div style={{fontSize:11.5,color:'var(--muted)',marginBottom:10}}>{item.CategoryName} · {getBrand(item.ItemName)}</div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:13,color:'var(--amber)',fontWeight:600}}>₱{getRentalRate(item).toLocaleString()}<span style={{color:'var(--muted)',fontWeight:400}}>/day</span></span>
+                  <Chip tone={condTone(item.ConditionStatus)}>{item.ConditionStatus}</Chip>
+                </div>
+              </div>
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div style={{gridColumn:'1/-1',textAlign:'center',color:'var(--muted)',padding:40,fontSize:13}}>No equipment matches your filters.</div>
+          )}
+        </div>
+
+        {totalPages > 1 && (
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:18}}>
+            <span style={{fontSize:12, color:'var(--muted)', fontFamily:"'IBM Plex Mono',monospace"}}>
+              {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} items
+            </span>
+            <div style={{display:'flex', gap:6}}>
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                style={{padding:'6px 13px', borderRadius:8, border:'1px solid var(--line)', background:'var(--card)', color: safePage === 1 ? 'var(--muted)' : 'var(--text)', cursor: safePage === 1 ? 'default' : 'pointer', fontSize:12, fontFamily:"'Inter',sans-serif"}}
+              >
+                ← Prev
+              </button>
+              {Array.from({length: totalPages}, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                .reduce((acc, p, idx, arr) => {
+                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, idx) => p === '...' ? (
+                  <span key={`ellipsis-${idx}`} style={{padding:'6px 4px', color:'var(--muted)', fontSize:12}}>…</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentPage(p)}
+                    style={{padding:'6px 11px', borderRadius:8, border:'1px solid', borderColor: p === safePage ? 'var(--amber)' : 'var(--line)', background: p === safePage ? 'var(--amber)' : 'var(--card)', color: p === safePage ? '#1A1320' : 'var(--text)', cursor:'pointer', fontSize:12, fontWeight: p === safePage ? 600 : 400, fontFamily:"'Inter',sans-serif"}}
+                  >
+                    {p}
+                  </button>
+                ))
+              }
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                style={{padding:'6px 13px', borderRadius:8, border:'1px solid var(--line)', background:'var(--card)', color: safePage === totalPages ? 'var(--muted)' : 'var(--text)', cursor: safePage === totalPages ? 'default' : 'pointer', fontSize:12, fontFamily:"'Inter',sans-serif"}}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {selectedItem && (
+        <Modal title={selectedItem.ItemName} onClose={() => setSelectedItem(null)}>
+          <div style={{height:180, background:'var(--card-hover)', borderRadius:10, overflow:'hidden', marginBottom:14, position:'relative'}}>
+            {selectedItem.ImagePath
+              ? <img src={selectedItem.ImagePath} alt={selectedItem.ItemName} style={{width:'100%',height:'100%',objectFit:'cover'}} />
+              : <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--muted)',opacity:0.3}}>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><circle cx="12" cy="13" r="2.5"/></svg>
+                </div>
+            }
+            <div style={{position:'absolute',top:10,right:10}}><Chip tone={availTone(selectedItem.Status)}>{selectedItem.Status}</Chip></div>
+          </div>
+
+          <div style={{fontSize:12.5,color:'var(--muted)',marginBottom:14}}>
+            {selectedItem.CategoryName} · {getBrand(selectedItem.ItemName)} · Serial {selectedItem.SerialNumber}
+          </div>
+
+          <div style={{display:'flex',gap:8,marginBottom:14}}>
+            <Chip tone={condTone(selectedItem.ConditionStatus)}>{selectedItem.ConditionStatus}</Chip>
+          </div>
+
+          {selectedItem.Description && (
+            <div style={{fontSize:12.5,color:'var(--text)',lineHeight:1.6,marginBottom:18}}>
+              {selectedItem.Description}
+            </div>
+          )}
+
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+            <span style={{fontSize:12,color:'var(--muted)'}}>Rental Rate</span>
+            <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:16,color:'var(--amber)',fontWeight:600}}>₱{getRentalRate(selectedItem).toLocaleString()}<span style={{color:'var(--muted)',fontWeight:400,fontSize:12}}>/day</span></span>
+          </div>
+          <div style={{display:'flex',gap:8,marginTop:6}}>
+            <button
+              disabled={selectedItem.Status !== 'Available'}
+              onClick={() => { onRent(selectedItem); setSelectedItem(null); }}
+              style={{...buttonStyle, flex:1, marginTop:0, opacity: selectedItem.Status === 'Available' ? 1 : 0.4}}
+            >
+              {selectedItem.Status === 'Available' ? 'Rent Item' : 'Currently Unavailable'}
+            </button>
+            <button
+              disabled={selectedItem.Status !== 'Available'}
+              onClick={() => onToggleCart(selectedItem)}
+              title={isInCart(selectedItem) ? 'Remove from cart' : 'Add to cart'}
+              style={{
+                width:44, flexShrink:0, borderRadius:9, border:'1px solid var(--line)',
+                background: isInCart(selectedItem) ? 'var(--amber)' : 'var(--card-hover)',
+                color: isInCart(selectedItem) ? '#1A1320' : 'var(--text)',
+                cursor: selectedItem.Status === 'Available' ? 'pointer' : 'default',
+                opacity: selectedItem.Status === 'Available' ? 1 : 0.4,
+                display:'flex', alignItems:'center', justifyContent:'center',
+              }}
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill={isInCart(selectedItem) ? '#1A1320' : 'none'} stroke="currentColor" strokeWidth="1.7">
+                <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+              </svg>
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* ── 2. Compatibility Checker ── */
+function CustomerCompat({ data, cartItems, onToggleCart }) {
+  const { inventory } = data;
+  const bodies  = inventory.filter(i => i.CategoryName === 'Camera Bodies' && !Number(i.Archived));
+  const lenses  = inventory.filter(i => i.CategoryName === 'Lenses'        && !Number(i.Archived));
+  const [compat,  setCompat]  = useState([]);
+  const [selBody, setSelBody] = useState('');
+  const [selLens, setSelLens] = useState('');
+
+  useEffect(() => {
+    fetch('/api/compatibility').then(r => r.json()).then(setCompat).catch(console.error);
+  }, []);
+
+  const resultItems = selBody
+    ? lenses.filter(l => compat.some(c => c.CameraSerial === selBody && c.LensSerial === l.SerialNumber))
+    : selLens
+    ? bodies.filter(b => compat.some(c => c.LensSerial === selLens && c.CameraSerial === b.SerialNumber))
+    : [];
+
+  const availTone = s => s === 'Available' ? 'green' : s === 'Rented' ? 'amber' : 'rose';
+  const isInCart  = item => (cartItems || []).some(c => c.SerialNumber === item.SerialNumber);
+
+  return (
+    <div style={{maxWidth:780}}>
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'24px 26px',marginBottom:18}}>
+        <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:18,marginBottom:6}}>Lens–Camera Compatibility Checker</div>
+        <div style={{fontSize:13,color:'var(--muted)',marginBottom:22}}>Select a camera body or a lens to see what is compatible in our current inventory.</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+          <div>
+            <label style={{display:'block',fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:7}}>Select Camera Body</label>
+            <SearchableSelect
+              options={bodies.map(b=>({ value:b.SerialNumber, label:b.ItemName }))}
+              value={selBody}
+              onChange={v=>{setSelBody(v);setSelLens('');}}
+              placeholder="— Choose camera body —"
+            />
+          </div>
+          <div>
+            <label style={{display:'block',fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:7}}>Or Select a Lens</label>
+            <SearchableSelect
+              options={lenses.map(l=>({ value:l.SerialNumber, label:l.ItemName }))}
+              value={selLens}
+              onChange={v=>{setSelLens(v);setSelBody('');}}
+              placeholder="— Choose lens —"
+            />
+          </div>
+        </div>
+      </div>
+
+      {(selBody || selLens) && resultItems.length === 0 && (
+        <div style={{textAlign:'center',color:'var(--muted)',fontSize:13,padding:24}}>
+          No compatible items found in inventory.
+        </div>
+      )}
+
+      {resultItems.length > 0 && (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+          {resultItems.map(item=>{
+            const inCart = isInCart(item);
+            const canAdd = item.Status === 'Available';
+            return (
+              <div key={item.SerialNumber} style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:'16px'}}>
+                <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{item.ItemName}</div>
+                <div style={{fontSize:11.5,color:'var(--muted)',marginBottom:10}}>{item.CategoryName}</div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                  <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:'var(--amber)'}}>₱{getRentalRate(item).toLocaleString()}/day</span>
+                  <Chip tone={availTone(item.Status)}>{item.Status}</Chip>
+                </div>
+                <button
+                  onClick={() => canAdd && onToggleCart && onToggleCart(item)}
+                  disabled={!canAdd}
+                  title={inCart ? 'Remove from cart' : 'Add to cart'}
+                  style={{
+                    width:'100%', padding:'7px 0', borderRadius:8, border:'1px solid var(--line)',
+                    background: inCart ? 'var(--amber)' : 'var(--card-hover)',
+                    color: inCart ? '#1A1320' : 'var(--text)',
+                    cursor: canAdd ? 'pointer' : 'default',
+                    opacity: canAdd ? 1 : 0.4,
+                    fontSize:12, fontWeight:600,
+                    display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill={inCart ? '#1A1320' : 'none'} stroke="currentColor" strokeWidth="1.7">
+                    <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                  </svg>
+                  {inCart ? 'In Cart' : 'Add to Cart'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CustomerRent({ data, profile, onSuccess, refetch, preselectItems, onConsumePreselect, clearCart }) {
+  const { inventory, categories } = data;
+  const available = inventory.filter(i => i.Status === 'Available' && !Number(i.Archived));
+  const hasPreselect = Array.isArray(preselectItems) && preselectItems.length > 0;
+
+  function capPerCategory(items) {
+    const counts = {};
+    const kept = [];
+    let trimmed = false;
+    for (const item of items) {
+      counts[item.CategoryName] = (counts[item.CategoryName] || 0) + 1;
+      if (counts[item.CategoryName] <= 3) kept.push(item);
+      else trimmed = true;
+    }
+    return { kept, trimmed };
+  }
+  const capped = hasPreselect ? capPerCategory(preselectItems) : { kept: [], trimmed: false };
+
+  const [step, setStep]       = useState(1);
+  const [selCat, setSelCat]   = useState(capped.kept[0]?.CategoryName ?? null);
+  const [cart, setCart]       = useState(capped.kept);
+  const [days, setDays]       = useState(1);
+  const [itemPage, setItemPage] = useState(1);
+  const ITEMS_PER_PAGE = 8;
+  const [agreed, setAgreed]   = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [refNum, setRefNum]   = useState(null);
+  const [err, setErr]         = useState(null);
+
+    useEffect(() => {
+    if (hasPreselect && onConsumePreselect) onConsumePreselect();
+  }, []);
+
+
+  const durations = [1, 3, 5, 7, 14, 30];
+
+  // Categories that actually have available items
+  const availableCats = categories.filter(c =>
+    available.some(i => i.CategoryName === c.CategoryName)
+  );
+
+  // Items in selected category
+  const catItems = selCat ? available.filter(i => i.CategoryName === selCat) : [];
+
+  // Cart helpers
+  const totalRate    = cart.reduce((sum, i) => sum + getRentalRate(i), 0);
+  const totalDeposit = Math.min(Math.max(totalRate * days * 0.5, totalRate), totalRate * 10);
+  const totalCost    = totalRate * days;
+
+    const [limitMsg, setLimitMsg] = useState(
+    capped.trimmed ? 'Your cart had more than 3 items in one category — only the first 3 per category were carried over. Unselect one to swap in another.' : null
+  );
+
+
+  function toggleCart(item) {
+    const already = cart.find(i => i.SerialNumber === item.SerialNumber);
+    if (!already) {
+      const catCount = cart.filter(i => i.CategoryName === item.CategoryName).length;
+      if (catCount >= 3) {
+        setLimitMsg(`You've hit the 3-item limit for ${item.CategoryName}. Deselect one to add another.`);
+        return;
+      }
+    }
+    setLimitMsg(null);
+    setCart(prev =>
+      already
+        ? prev.filter(i => i.SerialNumber !== item.SerialNumber)
+        : [...prev, item]
+    );
+  }
+  function inCart(item) { return cart.some(i => i.SerialNumber === item.SerialNumber); }
+
+  function getExpectedBack() {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
+  }
+
+  function submitRental() {
+    if (!profile || cart.length === 0) return;
+    setSaving(true);
+    setErr(null);
+    fetch('/api/rentals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'create',
+        CustomerID: profile.CustomerID,
+        SerialNumbers: cart.map(i => i.SerialNumber),
+        SerialNumber: cart[0].SerialNumber,   // kept for backend compatibility
+        ExpectedBack: getExpectedBack(),
+        DepositAmount: totalDeposit,
+      }),
+    })
+      .then(r => r.json())
+      .then(res => {
+        setSaving(false);
+        if (res.success) { setRefNum(res.RentalID); setStep(4); refetch(); if (clearCart) clearCart(); }
+        else setErr(res.error || 'Something went wrong.');
+      })
+      .catch(() => { setSaving(false); setErr('Could not reach the server.'); });
+  }
+
+  const stepLabels = ['Select Equipment', 'Duration & Cost', 'Agreement', 'Submitted'];
+  const stepStyle = (s) => ({
+    display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5,
+    fontWeight: step === s ? 600 : 400,
+    color: step >= s ? (step === s ? 'var(--amber)' : 'var(--green)') : 'var(--muted)',
+  });
+  const circleStyle = (s) => ({
+    width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center',
+    justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0,
+    background: step > s ? 'var(--green)' : step === s ? 'var(--amber)' : 'var(--line)',
+    color: step >= s ? '#1A1320' : 'var(--muted)',
+  });
+
+  return (
+    <div style={{maxWidth: 680}}>
+      {/* Step indicator */}
+      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:28,flexWrap:'wrap'}}>
+        {stepLabels.map((label, i) => (
+          <Fragment key={i}>
+            <div style={stepStyle(i + 1)}>
+              <div style={circleStyle(i + 1)}>{step > i + 1 ? '✓' : i + 1}</div>
+              {label}
+            </div>
+            {i < stepLabels.length - 1 && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--line)" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>}
+          </Fragment>
+        ))}
+      </div>
+
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'24px 26px'}}>
+
+        {/* Step 1 — category picker → item picker */}
+        {step === 1 && (
+          <>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:17,marginBottom:4}}>Select Equipment</div>
+            <div style={{fontSize:13,color:'var(--muted)',marginBottom:6}}>
+              {selCat ? (
+                <span>
+                  <span
+                    onClick={() => setSelCat(null)}
+                    style={{color:'var(--amber)',cursor:'pointer',fontWeight:500}}
+                  >
+                    All Categories
+                  </span>
+                  {' › '}{selCat}
+                </span>
+              ) : 'Pick a category to browse available gear.'}
+            </div>
+            <div style={{fontSize:11.5,color:'var(--muted)',marginBottom:18}}>
+              You can pick equipment from multiple categories — up to 3 items per category.
+            </div>
+
+            {/* Category cards */}
+            {!selCat && (
+              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:10,marginBottom:20}}>
+                {availableCats.map(c => {
+                  const count = available.filter(i => i.CategoryName === c.CategoryName).length;
+                  return (
+                    <div key={c.CategoryID} onClick={() => { setSelCat(c.CategoryName); setItemPage(1); }}
+                      style={{padding:'18px 20px',borderRadius:12,border:'1px solid var(--line)',background:'var(--card-hover)',cursor:'pointer',transition:'border-color .15s,transform .15s'}}
+                      onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(255,180,84,0.5)';e.currentTarget.style.transform='translateY(-2px)';}}
+                      onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--line)';e.currentTarget.style.transform='none';}}
+                    >
+                      <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:14,marginBottom:6}}>{c.CategoryName}</div>
+                      <div style={{fontSize:12,color:'var(--muted)'}}>{count} item{count !== 1 ? 's' : ''} available</div>
+                    </div>
+                  );
+                })}
+                {availableCats.length === 0 && (
+                  <div style={{gridColumn:'1/-1',color:'var(--muted)',fontSize:13}}>No equipment available right now.</div>
+                )}
+              </div>
+            )}
+
+            {/* Item list within selected category */}
+            {selCat && (
+              <>
+                {limitMsg && (
+                  <div style={{background:'rgba(251,113,133,0.1)',border:'1px solid rgba(251,113,133,0.3)',borderRadius:8,padding:'9px 12px',marginBottom:12,fontSize:12.5,color:'var(--rose)'}}>
+                    {limitMsg}
+                  </div>
+                )}
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
+                  {catItems.slice((itemPage-1)*ITEMS_PER_PAGE, itemPage*ITEMS_PER_PAGE).map(item => {
+                    const selected = inCart(item);
+                    return (
+                      <div key={item.SerialNumber} onClick={() => toggleCart(item)}
+                        style={{padding:'14px 16px',borderRadius:10,border:`1px solid ${selected ? 'var(--amber)' : 'var(--line)'}`,background:selected ? 'rgba(255,180,84,0.07)' : 'var(--card-hover)',cursor:'pointer',transition:'border-color .15s',position:'relative'}}
+                      >
+                        {selected && (
+                          <div style={{position:'absolute',top:10,right:10,width:18,height:18,borderRadius:'50%',background:'var(--amber)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1A1320" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                          </div>
+                        )}
+                        <div style={{fontWeight:600,fontSize:13,paddingRight:24}}>{item.ItemName}</div>
+                        <div style={{fontSize:11.5,color:'var(--muted)',margin:'3px 0 8px'}}>{item.ConditionStatus}</div>
+                        <div style={{fontSize:12,color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace"}}>₱{getRentalRate(item).toLocaleString()}/day</div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {catItems.length > ITEMS_PER_PAGE && (
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,marginBottom:16}}>
+                    <button
+                      disabled={itemPage === 1}
+                      onClick={() => setItemPage(p => p - 1)}
+                      style={{background:'var(--card-hover)',border:'1px solid var(--line)',borderRadius:8,color:'var(--text)',padding:'6px 12px',fontSize:12.5,cursor: itemPage===1 ? 'default':'pointer',opacity: itemPage===1 ? 0.4:1}}
+                    >← Prev</button>
+                    <span style={{fontSize:12,color:'var(--muted)',fontFamily:"'IBM Plex Mono',monospace"}}>
+                      Page {itemPage} of {Math.ceil(catItems.length / ITEMS_PER_PAGE)}
+                    </span>
+                    <button
+                      disabled={itemPage >= Math.ceil(catItems.length / ITEMS_PER_PAGE)}
+                      onClick={() => setItemPage(p => p + 1)}
+                      style={{background:'var(--card-hover)',border:'1px solid var(--line)',borderRadius:8,color:'var(--text)',padding:'6px 12px',fontSize:12.5,cursor: itemPage>=Math.ceil(catItems.length/ITEMS_PER_PAGE) ? 'default':'pointer',opacity: itemPage>=Math.ceil(catItems.length/ITEMS_PER_PAGE) ? 0.4:1}}
+                    >Next →</button>
+                  </div>
+                )}
+
+                {/* Cart summary bar */}
+                {cart.length > 0 && (
+                  <div style={{background:'rgba(255,180,84,0.08)',border:'1px solid rgba(255,180,84,0.3)',borderRadius:10,padding:'12px 16px',marginBottom:16,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <div>
+                      <div style={{fontSize:12.5,fontWeight:600,color:'var(--text)'}}>{cart.length} item{cart.length > 1 ? 's' : ''} selected</div>
+                      <div style={{fontSize:11.5,color:'var(--muted)',marginTop:2}}>{cart.map(i => i.ItemName).join(', ')}</div>
+                    </div>
+                    <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:13,color:'var(--amber)',fontWeight:600,flexShrink:0,marginLeft:12}}>
+                      ₱{totalRate.toLocaleString()}/day
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            <button
+              disabled={cart.length === 0}
+              onClick={() => setStep(2)}
+              style={{...buttonStyle, opacity: cart.length > 0 ? 1 : 0.4}}
+            >
+              Continue to Duration ({cart.length} item{cart.length !== 1 ? 's' : ''})
+            </button>
+          </>
+        )}
+
+        {/* Step 2 — Duration & Cost */}
+        {step === 2 && (
+          <>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:17,marginBottom:4}}>Duration & Cost</div>
+            <div style={{fontSize:13,color:'var(--muted)',marginBottom:16}}>
+              {cart.length === 1 ? `Renting: ` : `Renting ${cart.length} items:`}
+              {cart.length === 1
+                ? <strong style={{color:'var(--text)'}}> {cart[0].ItemName}</strong>
+                : <div style={{marginTop:6,display:'flex',flexDirection:'column',gap:4}}>
+                    {cart.map(i => (
+                      <div key={i.SerialNumber} style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}>
+                        <span style={{color:'var(--text)',fontWeight:500}}>{i.ItemName}</span>
+                                                <span style={{fontFamily:"'IBM Plex Mono',monospace",color:'var(--amber)'}}>₱{getRentalRate(i).toLocaleString()}/day</span>
+                      </div>
+                    ))}
+                  </div>
+              }
+            </div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:20}}>
+              {durations.map(d => (
+                <div key={d} onClick={() => setDays(d)} className={`pill ${days === d ? 'on' : ''}`} style={{minWidth:52,textAlign:'center'}}>
+                  {d} day{d > 1 ? 's' : ''}
+                </div>
+              ))}
+            </div>
+            <div style={{background:'var(--card-hover)',border:'1px solid var(--line)',borderRadius:10,padding:'16px 18px',marginBottom:20}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:8,fontSize:13}}><span style={{color:'var(--muted)'}}>Combined Rate</span><span style={{fontFamily:"'IBM Plex Mono',monospace"}}>₱{totalRate.toLocaleString()}/day</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:8,fontSize:13}}><span style={{color:'var(--muted)'}}>Duration</span><span style={{fontFamily:"'IBM Plex Mono',monospace"}}>{days} day{days > 1 ? 's' : ''}</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:8,fontSize:13}}><span style={{color:'var(--muted)'}}>Security Deposit</span><span style={{fontFamily:"'IBM Plex Mono',monospace"}}>₱{totalDeposit.toLocaleString()}</span></div>
+              <div style={{borderTop:'1px solid var(--line)',marginTop:10,paddingTop:10,display:'flex',justifyContent:'space-between',fontWeight:700,fontSize:15}}>
+                <span>Total Cost</span><span style={{color:'var(--amber)'}}>₱{totalCost.toLocaleString()}</span>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={() => setStep(1)} style={{...buttonStyle,background:'var(--card-hover)',color:'var(--text)',flex:1}}>Back</button>
+              <button onClick={() => setStep(3)} style={{...buttonStyle,flex:2}}>Review Agreement</button>
+            </div>
+          </>
+        )}
+
+        {/* Step 3 — Agreement */}
+        {step === 3 && (
+          <>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:17,marginBottom:16}}>Rental Agreement</div>
+            <div style={{background:'var(--card-hover)',border:'1px solid var(--line)',borderRadius:10,padding:'16px 18px',fontSize:12.5,lineHeight:1.8,color:'var(--muted)',marginBottom:18,maxHeight:220,overflowY:'auto'}}>
+              <p><strong style={{color:'var(--text)'}}>1. Equipment Condition</strong><br/>The renter agrees to return equipment in the same condition as received. Damage beyond normal wear will be charged against the security deposit.</p>
+              <p><strong style={{color:'var(--text)'}}>2. Return Policy</strong><br/>Equipment must be returned by the agreed return date. Late returns are subject to additional daily rental charges.</p>
+              <p><strong style={{color:'var(--text)'}}>3. Security Deposit</strong><br/>A refundable deposit of ₱{totalDeposit.toLocaleString()} is required. It will be refunded within 3-5 business days after inspection upon return.</p>
+              <p><strong style={{color:'var(--text)'}}>4. Liability</strong><br/>The renter is responsible for loss, theft, or damage to equipment during the rental period.</p>
+              <p><strong style={{color:'var(--text)'}}>5. ID Verification</strong><br/>A valid government-issued ID must be presented at pickup.</p>
+            </div>
+            <label style={{display:'flex',alignItems:'center',gap:10,fontSize:13,cursor:'pointer',marginBottom:18}}>
+              <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{width:16,height:16,accentColor:'var(--amber)'}} />
+              I have read and agree to the rental agreement terms.
+            </label>
+            {err && <div style={{color:'var(--rose)',fontSize:12.5,marginBottom:10}}>{err}</div>}
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={() => setStep(2)} style={{...buttonStyle,background:'var(--card-hover)',color:'var(--text)',flex:1}}>Back</button>
+              <button disabled={!agreed || saving} onClick={submitRental} style={{...buttonStyle,flex:2,opacity:agreed ? 1 : 0.4}}>
+                {saving ? 'Submitting…' : 'Submit Rental Request'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Step 4 — Confirmation */}
+        {step === 4 && (
+          <div style={{textAlign:'center',padding:'20px 0'}}>
+            <div style={{width:56,height:56,borderRadius:'50%',background:'rgba(74,222,128,0.12)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px'}}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:18,marginBottom:8}}>Request Submitted!</div>
+            <div style={{fontSize:13,color:'var(--muted)',marginBottom:16}}>Your reference number is</div>
+            <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:18,color:'var(--amber)',fontWeight:600,marginBottom:20}}>
+              RNT-{refNum}
+            </div>
+            <button onClick={onSuccess} style={buttonStyle}>Back to Dashboard</button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+/* ── 4. My Profile ── */
+function CustomerProfile({ profile, rentals, onProfileUpdated }) {
+  if (!profile) return <div style={{color:'var(--muted)',fontSize:13}}>Loading profile…</div>;
+
+  function getInitials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+
+  const deposits = rentals.filter(r => r.AmountHeld);
+  const depTone  = s => s === 'Full Refund' ? 'green' : s === 'Held' ? 'amber' : s === 'Forfeited' ? 'rose' : 'muted';
+  const depLabel = s => s === 'Full Refund' ? 'Refunded' : s;
+  const [selectedDeposit, setSelectedDeposit] = useState(null);
+  const [showAllDeposits, setShowAllDeposits] = useState(false);
+  const visibleDeposits = showAllDeposits ? deposits : deposits.slice(0, 3);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm]       = useState({ FirstName: profile.FirstName || '', MiddleName: profile.MiddleName || '', LastName: profile.LastName || '', ContactNumber: profile.ContactNumber || '', IDType: profile.IDType || '' });
+  const [saving, setSaving]           = useState(false);
+  const [err, setErr]                 = useState(null);
+  const [showIdUpload, setShowIdUpload] = useState(false);
+  const [confirmSave, setConfirmSave] = useState(false);
+  const [idFile, setIdFile]             = useState(null);
+  const [uploading, setUploading]       = useState(false);
+  const [uploadErr, setUploadErr]       = useState(null);
+
+  function uploadId() {
+    if (!idFile) { setUploadErr('Please choose an image first.'); return; }
+    setUploading(true);
+    setUploadErr(null);
+    const fd = new FormData();
+    fd.append('action', 'upload_id');
+    fd.append('IDImage', idFile);
+    fetch('/api/customers', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(res => {
+        setUploading(false);
+        if (res.success) { setShowIdUpload(false); setIdFile(null); if (onProfileUpdated) onProfileUpdated(); }
+        else setUploadErr(res.error || 'Upload failed.');
+      })
+      .catch(() => { setUploading(false); setUploadErr('Could not reach the server.'); });
+  }
+
+  function startEdit() {
+    setForm({ FirstName: profile.FirstName || '', MiddleName: profile.MiddleName || '', LastName: profile.LastName || '', ContactNumber: profile.ContactNumber || '', IDType: profile.IDType || '' });
+    setErr(null);
+    setEditing(true);
+  }
+
+  function saveEdit() {
+    if (!form.FirstName.trim() || !form.LastName.trim()) { setErr('First and last name are required.'); return; }
+    setSaving(true);
+    setErr(null);
+    fetch('/api/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'edit', ...form }),
+    })
+      .then(r => r.json())
+      .then(res => {
+        setSaving(false);
+        if (res.success) { setEditing(false); if (onProfileUpdated) onProfileUpdated(); }
+        else setErr(res.error || 'Could not update profile.');
+      })
+      .catch(() => { setSaving(false); setErr('Could not reach the server.'); });
+  }
+
+  const idOptions = ['Passport', "Driver's License", 'SSS ID', 'PhilHealth ID', 'Postal ID', "Voter's ID", 'National ID'];
+
+  return (
+    <div style={{maxWidth:640}}>
+      {/* Profile card */}
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'26px 28px',marginBottom:16}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:22}}>
+          <div style={{display:'flex',alignItems:'center',gap:18}}>
+            <div style={{width:60,height:60,borderRadius:'50%',background:'var(--amber)',color:'#1A1320',fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              {getInitials(profile.FullName)}
+            </div>
+            <div>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:20}}>{profile.FullName}</div>
+              <div style={{fontSize:13,color:'var(--muted)',marginTop:2}}>Customer ID: C-{String(profile.CustomerID).padStart(3,'0')}</div>
+              {profile.VerificationStatus === 'Verified'
+                ? <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12.5,color:'var(--green)',marginTop:4}}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    Government ID Verified
+                  </div>
+                : profile.VerificationStatus === 'Pending'
+                ? <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12.5,color:'var(--amber)',marginTop:4}}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    ID Verification Pending — under review
+                  </div>
+                : <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
+                    <span style={{fontSize:12.5,color:'var(--amber)'}}>⚠ ID Not Yet Verified</span>
+                    <button onClick={() => setShowIdUpload(true)} style={{display:'flex',alignItems:'center',gap:5,padding:'3px 10px',borderRadius:100,border:'1px solid var(--amber)',background:'none',color:'var(--amber)',fontSize:11.5,fontWeight:600,cursor:'pointer'}}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                      Upload ID
+                    </button>
+                  </div>
+              }
+            </div>
+          </div>
+          {!editing && (
+            <button onClick={startEdit} style={{padding:'8px 14px',borderRadius:8,border:'1px solid var(--line)',background:'var(--card-hover)',color:'var(--text)',fontSize:12.5,fontWeight:600,cursor:'pointer',flexShrink:0}}>
+              Edit Profile
+            </button>
+          )}
+        </div>
+
+        {!editing ? (
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+            {[
+              { label:'Contact', value: profile.ContactNumber || '—' },
+              { label:'ID Type', value: profile.IDType || '—' },
+              { label:'Total Rentals', value: `${rentals.length} completed` },
+            ].map((f,i) => (
+              <div key={i}>
+                <div style={{fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:5}}>{f.label}</div>
+                <div style={{fontSize:14,fontWeight:500}}>{f.value}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div>
+            <FormField label="First Name">
+              <input value={form.FirstName} onChange={e=>setForm({...form, FirstName:e.target.value})} style={inputStyle} />
+            </FormField>
+            <FormField label="Middle Name (optional)">
+              <input value={form.MiddleName} onChange={e=>setForm({...form, MiddleName:e.target.value})} style={inputStyle} />
+            </FormField>
+            <FormField label="Last Name">
+              <input value={form.LastName} onChange={e=>setForm({...form, LastName:e.target.value})} style={inputStyle} />
+            </FormField>
+            <FormField label="Contact Number">
+              <input value={form.ContactNumber} onChange={e=>setForm({...form, ContactNumber:e.target.value})} style={inputStyle} />
+            </FormField>
+            <FormField label="ID Type">
+              <select value={form.IDType} onChange={e=>setForm({...form, IDType:e.target.value})} style={inputStyle}>
+                <option value="">Select an ID type</option>
+                {idOptions.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </FormField>
+            {err && <div style={{color:'var(--rose)',fontSize:12.5,marginBottom:10}}>{err}</div>}
+            <div style={{display:'flex',gap:10,marginTop:6}}>
+              <button onClick={() => setEditing(false)} disabled={saving} style={{flex:1,padding:'10px',borderRadius:9,border:'1px solid var(--line)',background:'var(--card-hover)',color:'var(--text)',fontSize:13.5,fontWeight:600,cursor:'pointer'}}>
+                Cancel
+              </button>
+              <button onClick={() => setConfirmSave(true)} disabled={saving} style={{...buttonStyle,flex:1,marginTop:0,opacity:saving?0.6:1}}>
+                {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {confirmSave && (
+        <ConfirmDialog
+          title="Save Profile Changes"
+          message="Update your profile with the new information?"
+          confirmLabel="Save Changes"
+          confirmTone="amber"
+          onConfirm={() => { setConfirmSave(false); saveEdit(); }}
+          onCancel={() => setConfirmSave(false)}
+        />
+      )}
+      {showIdUpload && (
+        <Modal title="Upload Government ID" onClose={() => { setShowIdUpload(false); setIdFile(null); setUploadErr(null); }}>
+          <p style={{fontSize:12.5,color:'var(--muted)',marginBottom:14}}>
+            Upload a clear photo of your {profile.IDType || 'government-issued ID'}. Our shop staff will review it shortly.
+          </p>
+          <FormField label="ID Image">
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setIdFile(e.target.files[0] || null)} style={inputStyle} />
+          </FormField>
+          {uploadErr && <p style={{color:'var(--rose)',fontSize:12.5,marginBottom:8}}>{uploadErr}</p>}
+          <button onClick={uploadId} disabled={uploading} style={{...buttonStyle, opacity: uploading ? 0.6 : 1}}>
+            {uploading ? 'Uploading…' : 'Submit for Review'}
+          </button>
+        </Modal>
+      )}
+
+      {/* Deposit history */}
+      {deposits.length > 0 && (
+        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'20px 22px'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:15}}>Deposit History</div>
+            <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:11.5,color:'var(--muted)'}}>{deposits.length} total</div>
+          </div>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead>
+              <tr>
+                {['Deposit ID','Rental ID','Amount','Status'].map(h=>(
+                  <th key={h} style={{textAlign:'left',fontFamily:"'IBM Plex Mono',monospace",fontSize:10.5,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,padding:'8px 12px',borderBottom:'1px solid var(--line)'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {visibleDeposits.map((r,i)=>(
+                <tr key={i} className="row-clickable" onClick={() => setSelectedDeposit(r)}>
+                  <td style={{padding:'12px',borderBottom:'1px solid var(--line)',color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12}}>DEP-{r.DepositID}</td>
+                  <td style={{padding:'12px',borderBottom:'1px solid var(--line)',fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:'var(--muted)'}}>RNT-{r.RentalID}</td>
+                  <td style={{padding:'12px',borderBottom:'1px solid var(--line)',fontFamily:"'IBM Plex Mono',monospace",fontSize:13}}>₱{parseFloat(r.AmountHeld||0).toLocaleString()}</td>
+                  <td style={{padding:'12px',borderBottom:'1px solid var(--line)'}}><Chip tone={depTone(r.RefundStatus)}>{depLabel(r.RefundStatus)}</Chip></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {deposits.length > 3 && (
+            <div
+              onClick={() => setShowAllDeposits(v => !v)}
+              style={{textAlign:'center',marginTop:14,padding:'9px',borderRadius:8,border:'1px solid var(--line)',background:'var(--card-hover)',color:'var(--amber)',fontSize:12.5,fontWeight:600,cursor:'pointer'}}
+            >
+              {showAllDeposits ? 'Show Less' : `View All (${deposits.length})`}
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedDeposit && (
+        <Modal title={`Deposit DEP-${selectedDeposit.DepositID}`} onClose={() => setSelectedDeposit(null)}>
+          <div style={{display:'flex',flexDirection:'column',gap:14}}>
+            <div>
+              <div style={{fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:8}}>Item(s) Rented</div>
+              {selectedDeposit.ItemDetails && selectedDeposit.ItemDetails.length
+                ? selectedDeposit.ItemDetails.map((it, idx, arr) => (
+                    <div key={idx} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom: idx < arr.length - 1 ? '1px solid var(--line)' : 'none'}}>
+                      <span style={{fontSize:13.5,fontWeight:500}}>{it.ItemName}</span>
+                      <span style={{fontSize:11.5,color:'var(--amber)',fontFamily:"'IBM Plex Mono',monospace",background:'var(--card-hover)',padding:'2px 8px',borderRadius:6,flexShrink:0,marginLeft:10}}>{it.SerialNumber}</span>
+                    </div>
+                  ))
+                : <div style={{fontSize:14,fontWeight:500}}>—</div>
+              }
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+              <div>
+                <div style={{fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:5}}>Date Out</div>
+                <div style={{fontSize:13.5}}>{fmtDate(selectedDeposit.DateOut) || '—'}</div>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:5}}>Expected Back</div>
+                <div style={{fontSize:13.5}}>{fmtDate(selectedDeposit.ExpectedBack) || '—'}</div>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:5}}>Actual Return</div>
+                <div style={{fontSize:13.5}}>{fmtDate(selectedDeposit.ActualReturn) || 'Not yet returned'}</div>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:5}}>Rental ID</div>
+                <div style={{fontSize:13.5,fontFamily:"'IBM Plex Mono',monospace",color:'var(--muted)'}}>RNT-{selectedDeposit.RentalID}</div>
+              </div>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingTop:10,borderTop:'1px solid var(--line)'}}>
+              <div>
+                <div style={{fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:0.5,marginBottom:5}}>Amount Held</div>
+                <div style={{fontSize:18,fontWeight:700,fontFamily:"'IBM Plex Mono',monospace"}}>₱{parseFloat(selectedDeposit.AmountHeld||0).toLocaleString()}</div>
+              </div>
+              <Chip tone={depTone(selectedDeposit.RefundStatus)}>{depLabel(selectedDeposit.RefundStatus)}</Chip>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+

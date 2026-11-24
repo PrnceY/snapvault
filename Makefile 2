@@ -1,0 +1,18 @@
+include .env
+export
+
+deploy:
+	@echo "Deploying SnapVault to $(SSH_HOST)..."
+	@sshpass -p "$(SSH_PASSWORD)" \
+		rsync -avz --checksum --chmod=F644,D755 -e "ssh -p 22077 -o StrictHostKeyChecking=no" \
+		--exclude='.DS_Store' \
+		--exclude='.env' \
+		--exclude='.git' \
+		--exclude='.gitignore' \
+		--exclude='Makefile' \
+		--exclude='*.md' \
+		./public/ \
+		"$(SSH_USER)@$(SSH_HOST):$(DEPLOY_PATH)/"
+	@echo "Done."
+
+.PHONY: deploy
